@@ -1,6 +1,6 @@
 [package]
 name = "cyrene-audio-seeker"
-version = "0.1.0"
+version = "26.0.0"
 description = "Cyreneの音频检索器 - 音频指纹检索工具"
 edition = "2021"
 

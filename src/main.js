@@ -1,9 +1,14 @@
 import { createApp } from 'vue'
 import { createRouter, createWebHashHistory } from 'vue-router'
+import { addCollection } from '@iconify/vue'
+import fluentIcons from '@iconify-json/fluent/icons.json'
 import 'vue-fluent-widgets/style.css'
 import './assets/css/main.css'
 import App from './App.vue'
 import { settings, onSettingsChange } from './stores/settings'
+
+// 本地注册 Fluent 图标集：离线可用（不依赖 iconify 在线 API）
+addCollection(fluentIcons)
 
 // 主题：peach（桃粉）+ 深色，跟随设置
 function applyTheme() {

@@ -13,14 +13,8 @@
       </button>
       <span class="tb-title">{{ t('appName') }}</span>
       <div class="tb-spacer" />
-      <button class="tb-btn" :title="t('checkUpdate')" @click.stop="doCheck">
-        <Icon icon="fluent:arrow-circle-down-24-regular" :width="17" />
-      </button>
       <button class="tb-btn" title="GitHub" @click.stop="openGithub">
         <Icon icon="fluent:mark-github-24-regular" :width="17" />
-      </button>
-      <button class="tb-btn" :title="t('settings')" @click.stop="router.push('/settings')">
-        <Icon icon="fluent:settings-24-regular" :width="17" />
       </button>
       <div class="tb-sep" />
       <button class="tb-btn win" title="最小化" @click.stop="minimize">
@@ -39,16 +33,12 @@
 <script setup>
 import { FluentTitleBar } from 'vue-fluent-widgets'
 import { Icon } from '@iconify/vue'
-import { useRouter } from 'vue-router'
 import { t } from '../../utils/i18n'
 import { tauri } from '../../utils/api'
-import { checkUpdate, updateState } from '../../utils/updater'
-import { pushToast } from '../../components/ToastHost.vue'
 
 defineProps({ hamburger: Boolean })
 defineEmits(['toggle-hamburger'])
 
-const router = useRouter()
 const GITHUB = 'https://github.com/Cyrene2008/CyreneAudioSeeker'
 
 async function minimize() {
@@ -67,16 +57,6 @@ async function close() {
   if (tauri.isTauri) {
     const win = (await import('@tauri-apps/api/window')).getCurrentWindow()
     win.close()
-  }
-}
-async function doCheck() {
-  const r = await checkUpdate()
-  if (r.available) {
-    pushToast({ title: `${t('updateFound')} v${r.version}`, body: (r.body || '').slice(0, 200), url: r.url })
-  } else if (r.error) {
-    pushToast({ title: t('updateFail'), body: r.error })
-  } else {
-    pushToast({ title: t('upToDate'), body: `v${r.version}` })
   }
 }
 function openGithub() {

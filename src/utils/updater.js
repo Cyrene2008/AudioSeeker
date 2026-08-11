@@ -20,8 +20,8 @@ export const updateState = ref({
 
 export function currentVersion() {
   return tauri.isTauri
-    ? '0.1.0'
-    : (import.meta.env.VITE_APP_VERSION || '0.1.0')
+    ? '26.0.0'
+    : (import.meta.env.VITE_APP_VERSION || '26.0.0')
 }
 
 function normalize(v) {

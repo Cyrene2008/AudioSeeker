@@ -1,9 +1,7 @@
 <template>
   <div class="about">
     <div class="about-card">
-      <div class="about-logo">
-        <Icon icon="fluent:headphones-sound-wave-24-filled" :width="56" />
-      </div>
+      <img :src="avatar" class="about-avatar" alt="Cyrene2008" />
       <h1>Cyreneの音频检索器</h1>
       <div class="about-ver mono">v{{ version }}</div>
       <p class="about-desc">{{ t('ackLibs') }}</p>
@@ -32,6 +30,7 @@
 <script setup>
 import { FluentButton, FluentHyperlinkButton } from 'vue-fluent-widgets'
 import { Icon } from '@iconify/vue'
+import avatar from '../assets/avatars/Cyrene2008.png'
 import { t } from '../utils/i18n'
 import { tauri } from '../utils/api'
 import { checkUpdate, updateState, currentVersion } from '../utils/updater'
@@ -70,16 +69,12 @@ async function doCheck() {
   border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
   background: var(--bg-card-solid, #fff);
 }
-.about-logo {
+.about-avatar {
   width: 84px;
   height: 84px;
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   border-radius: 50%;
-  background: linear-gradient(135deg, #ff6fb0, #ea5ec1);
-  color: #fff;
+  object-fit: cover;
+  box-shadow: 0 4px 16px rgba(234, 94, 193, 0.3);
 }
 .about-card h1 { margin: 12px 0 4px; font-size: 22px; }
 .about-ver { color: var(--text-secondary); font-size: 13px; }

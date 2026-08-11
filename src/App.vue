@@ -1,6 +1,6 @@
 <template>
   <div class="app-shell">
-    <template v-if="bootState.phase !== 'ready'">
+    <template v-if="bootState.phase !== 'ready' && !skipped">
       <div class="boot-overlay">
         <div class="boot-card">
           <div class="boot-logo">
@@ -15,6 +15,9 @@
           <FluentButton v-if="bootState.phase === 'error'" @click="location.reload()">
             {{ t('refresh') }}
           </FluentButton>
+          <FluentButton v-if="bootLong" appearance="subtle" style="margin-top: 10px" @click="skipBoot">
+            跳过等待，直接进入界面（后端将在后台继续启动）
+          </FluentButton>
         </div>
       </div>
     </template>
@@ -28,26 +31,37 @@
         </main>
       </div>
       <PlayerBar />
+      <FluentInfoBar
+        v-if="bootState.phase !== 'ready'"
+        severity="warning"
+        :title="bootDetail"
+        :closable="false"
+        style="margin: 0 16px"
+      />
     </template>
 
+    <VersionBadge />
     <ToastHost />
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { FluentButton } from 'vue-fluent-widgets'
+import { FluentButton, FluentInfoBar } from 'vue-fluent-widgets'
 import { Icon } from '@iconify/vue'
 import TitleBar from './components/layout/TitleBar.vue'
 import Dock from './components/layout/Dock.vue'
 import PlayerBar from './components/layout/PlayerBar.vue'
 import ToastHost from './components/ToastHost.vue'
+import VersionBadge from './components/VersionBadge.vue'
 import { t } from './utils/i18n'
 import { tauri, api } from './utils/api'
 import { loadSettingsFromBackend } from './stores/settings'
 
 const bootState = ref({ phase: 'starting', detail: '', progress: 0, error: '' })
 const hamburgerOpen = ref(false)
+const bootLong = ref(false)
+const skipped = ref(false)
 
 const bootDetail = computed(() => {
   const s = bootState.value
@@ -77,12 +91,17 @@ const bootProgress = computed(() => {
 })
 
 let timer = null
+let longTimer = null
 
 async function poll() {
-  const s = await tauri.invoke('backend_status')
+  let s = null
+  try {
+    s = await tauri.invoke('backend_status')
+  } catch { /* invoke 异常时继续轮询 */ }
   if (s) bootState.value = s
   if (s && s.ready) {
     clearInterval(timer)
+    clearTimeout(longTimer)
     try {
       loadSettingsFromBackend(await api.get('/api/settings'))
     } catch { /* ignore */ }
@@ -91,16 +110,25 @@ async function poll() {
   timer = setTimeout(poll, 800)
 }
 
+function skipBoot() {
+  skipped.value = true // 直接进入主界面，后端后台继续启动，就绪后自动刷新
+  poll()
+}
+
 onMounted(() => {
   if (!tauri.isTauri) {
     bootState.value = { phase: 'ready', detail: '', progress: 1 }
-    loadSettingsFromBackend({ lang: 'zh', dark: true })
+    loadSettingsFromBackend({ lang: 'zh', dark: false })
     return
   }
   poll()
+  longTimer = setTimeout(() => { bootLong.value = true }, 15000)
 })
 
-onUnmounted(() => clearInterval(timer))
+onUnmounted(() => {
+  clearInterval(timer)
+  clearTimeout(longTimer)
+})
 </script>
 
 <style scoped>

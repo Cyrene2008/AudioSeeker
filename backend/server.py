@@ -24,7 +24,7 @@ import fp_core
 from fp_core import (load_audio, extract_hashes, load_indexes, match_index,
                      export_stitch, list_index_segments, iter_library_files)
 
-APP_VERSION = '0.1.0'
+APP_VERSION = '26.0.0'
 APP_DIR = os.environ.get('CYRENE_APP_DIR', os.getcwd())
 DATA_DIR = os.environ.get('CYRENE_DATA_DIR', os.path.join(
     tempfile.gettempdir(), 'cyrene-audio-seeker'))
@@ -58,9 +58,15 @@ def _save_json(path, data):
 
 def get_settings():
     s = _load_json(SETTINGS_FILE, {})
+    if s.get('schema', 1) < 2:
+        # v26 起默认浅色：清掉旧版残留的深色/主题设置
+        s.pop('dark', None)
+        s.pop('theme', None)
+        s['schema'] = 2
+        save_settings(s)
     s.setdefault('default_index_dir', os.path.join(APP_DIR, 'index'))
     s.setdefault('lang', 'zh')
-    s.setdefault('dark', True)
+    s.setdefault('dark', False)
     s.setdefault('theme', 'peach')
     return s
 

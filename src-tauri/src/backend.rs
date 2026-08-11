@@ -573,12 +573,23 @@ pub fn run_bootstrap(app: &tauri::AppHandle) {
     set_phase(Phase::Error, "后端服务启动超时");
 }
 
-/// 退出时杀掉后端进程。
+/// 退出时杀掉后端进程树（含其派生的 build/ffmpeg 子进程）。
+/// 只杀本应用启动的进程，不碰用户其他 Python 程序。
 pub fn backend_kill() {
     if let Ok(mut slot) = child_slot().lock() {
         if let Some(mut c) = slot.take() {
+            let pid = c.id();
             let _ = c.kill();
             let _ = c.wait();
+            #[cfg(windows)]
+            {
+                // 树杀：确保 uvicorn 派生的 build_index.py / ffmpeg 一并退出
+                let _ = Command::new("taskkill")
+                    .args(["/PID", &pid.to_string(), "/T", "/F"])
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .status();
+            }
         }
     }
 }
