@@ -2,6 +2,8 @@
 
 mod backend;
 
+use tauri_plugin_global_shortcut::GlobalShortcutExt;
+
 use tauri::Manager;
 
 #[tauri::command]
