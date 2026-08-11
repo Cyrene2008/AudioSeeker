@@ -49,9 +49,14 @@ const menuItems = computed(() => [
   height: 100%;
   min-height: 0;
 }
-/* 内容区排版：内边距 + 内部滚动（组件自带 overflow:auto） */
+/* 内容区排版：内边距 + 弹性布局占满可用区域 + 内部滚动（组件自带 overflow:auto） */
 .dock :deep(.navigation-view-content) {
+  display: flex;
+  flex-direction: column;
   padding: 20px 24px;
+}
+.dock :deep(.navigation-view-content > *) {
+  min-height: 0;
 }
 .dock-footer-item {
   position: relative;

@@ -1,7 +1,11 @@
 <template>
-  <div>
+  <div class="page">
     <h1 class="page-title">{{ t('search') }}</h1>
 
+    <FluentSegmented :model-value="mode" :items="modeItems" @update:model-value="mode = $event" style="margin-bottom: 14px" />
+
+    <!-- ============ 检索 ============ -->
+    <template v-if="mode === 'search'">
     <div class="form-row">
       <FluentComboBox
         class="grow"
@@ -30,7 +34,7 @@
       {{ t('hashCount') }}: {{ lastMeta.hash_count }} · {{ t('matched') }}: {{ occs.length }} {{ t('colAligned').toLowerCase() }}
     </div>
 
-    <div class="table-wrap">
+    <div class="table-wrap grow-area">
       <table class="result-table">
         <thead>
           <tr>
@@ -52,8 +56,8 @@
               {{ busy ? t('searching') : (searched ? t('emptyResult') : t('noResult')) }}
             </td>
           </tr>
-          <tr v-for="(o, i) in occs" :key="i" :class="{ selected: selected.value.has(i) }" @click="toggleRow(i)">
-            <td><input type="checkbox" :checked="selected.value.has(i)" @click.stop="toggleRow(i)" /></td>
+          <tr v-for="(o, i) in occs" :key="i" :class="{ selected: selected.has(i) }" @click="toggleRow(i)">
+            <td><input type="checkbox" :checked="selected.has(i)" @click.stop="toggleRow(i)" /></td>
             <td class="mono">{{ i + 1 }}</td>
             <td>{{ o.name }}</td>
             <td class="mono">{{ fmt(o.offset_file) }}</td>
@@ -74,18 +78,56 @@
 
     <div class="action-bar">
       <FluentButton compact @click="selectAll"><Icon icon="fluent:checkmark-circle-24-regular" :width="15" /> {{ t('selectAll') }}</FluentButton>
-      <FluentButton compact @click="selected.value.clear()">{{ t('clearSel') }}</FluentButton>
+      <FluentButton compact @click="selected.clear()">{{ t('clearSel') }}</FluentButton>
       <FluentButton compact :disabled="!selected.size" @click="favoriteSelected"><Icon icon="fluent:star-add-24-regular" :width="15" /> {{ t('favorite') }}</FluentButton>
       <FluentButton compact :disabled="!selected.size" @click="exportSelected"><Icon icon="fluent:save-arrow-right-24-regular" :width="15" /> {{ t('exportSel') }}</FluentButton>
       <FluentButton compact :disabled="!occs.length" @click="exportAll"><Icon icon="fluent:library-24-regular" :width="15" /> {{ t('exportResult') }}</FluentButton>
     </div>
+    </template>
+
+    <!-- ============ 历史 ============ -->
+    <template v-else>
+      <div v-if="!historyList.length" class="empty">
+        <FluentEmptyState icon="fluent:history-24-regular" :title="t('history')"
+          :description="t('noHistory')" />
+      </div>
+      <div v-else class="table-wrap grow-area">
+        <table class="result-table">
+          <thead>
+            <tr>
+              <th>{{ t('histSample') }}</th>
+              <th>{{ t('indexName') }}</th>
+              <th>{{ t('histCount') }}</th>
+              <th>时间</th>
+              <th style="width: 160px">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="h in historyList" :key="h.id">
+              <td class="mono" style="max-width: 320px; overflow: hidden; text-overflow: ellipsis">{{ basename(h.sample) }}</td>
+              <td>{{ h.index_name }}{{ h.segment ? ' / ' + h.segment : '' }}</td>
+              <td class="mono">{{ h.count }}</td>
+              <td class="mono">{{ h.time }}</td>
+              <td>
+                <FluentButton compact appearance="subtle" @click="loadHistory(h)">
+                  <Icon icon="fluent:play-24-regular" :width="14" /> {{ t('loadHistory') }}
+                </FluentButton>
+                <FluentButton compact appearance="subtle" @click="deleteHistory(h)">
+                  <Icon icon="fluent:delete-24-regular" :width="14" />
+                </FluentButton>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </template>
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, ref, toRefs } from 'vue'
 import {
-  FluentButton, FluentComboBox, FluentInfoBar, FluentInput
+  FluentButton, FluentComboBox, FluentEmptyState, FluentInfoBar, FluentInput, FluentSegmented
 } from 'vue-fluent-widgets'
 import { Icon } from '@iconify/vue'
 import { t } from '../utils/i18n'
@@ -95,6 +137,49 @@ import { searchState } from '../stores/search'
 import { pushToast } from '../components/ToastHost.vue'
 
 const frameSec = 256 / 11025
+
+const mode = ref('search')
+const modeItems = computed(() => [
+  { label: t('search'), value: 'search' },
+  { label: t('history'), value: 'history' }
+])
+const historyList = ref([])
+
+function basename(p) {
+  if (!p) return '-'
+  const parts = String(p).split(/[\\/]/)
+  return parts[parts.length - 1]
+}
+
+async function loadHistoryList() {
+  try {
+    historyList.value = await api.get('/api/history')
+  } catch { /* 静默 */ }
+}
+
+async function loadHistory(h) {
+  try {
+    const data = await api.get(`/api/history/${h.id}`)
+    const idxName = data.index_name || h.index_name
+    occs.value = (data.occurrences || []).map((o) => ({ ...o, index_name: idxName, segment: h.segment || null }))
+    lastMeta.value = { hash_count: data.hash_count || h.hash_count, occurrences: occs.value }
+    searched.value = true
+    selected.value.clear()
+    mode.value = 'search'
+    pushToast({ title: t('loadHistory'), body: basename(h.sample) })
+  } catch (e) {
+    pushToast({ title: t('loadHistory') + '?', body: e.message })
+  }
+}
+
+async function deleteHistory(h) {
+  try {
+    await api.delete(`/api/history/${h.id}`)
+    loadHistoryList()
+  } catch (e) {
+    pushToast({ title: t('deleteHistory') + '?', body: e.message })
+  }
+}
 
 const indexItems = computed(() => {
   const items = []
@@ -242,14 +327,18 @@ async function doExport(list) {
   }
 }
 
-onMounted(loadIndexes)
+onMounted(() => {
+  loadIndexes()
+  loadHistoryList()
+})
 </script>
 
 <style scoped>
 .meta-line { margin-bottom: 8px; font-size: 12px; color: var(--text-secondary); }
 .table-wrap {
   overflow: auto;
-  max-height: calc(100vh - 330px);
+  display: flex;
+  flex-direction: column;
   border-radius: 10px;
   border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
   background: var(--bg-card-solid, #fff);

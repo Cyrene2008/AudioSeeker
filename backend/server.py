@@ -33,6 +33,9 @@ os.makedirs(DATA_DIR, exist_ok=True)
 SETTINGS_FILE = os.path.join(DATA_DIR, 'settings.json')
 REGISTRY_FILE = os.path.join(DATA_DIR, 'indexes.json')
 FAVORITES_FILE = os.path.join(DATA_DIR, 'favorites.json')
+HISTORY_FILE = os.path.join(DATA_DIR, 'history.json')
+HISTORY_DIR = os.path.join(DATA_DIR, 'history')
+HISTORY_MAX = 50  # 最多保留的检索历史条数
 TMP_DIR = os.path.join(DATA_DIR, 'tmp')
 os.makedirs(TMP_DIR, exist_ok=True)
 
@@ -372,6 +375,64 @@ def build_cancel():
         return {'ok': False, 'detail': '无进行中的任务'}
 
 
+# ---------- 检索历史 ----------
+
+
+def get_history():
+    return _load_json(HISTORY_FILE, [])
+
+
+def add_history(meta, occurrences):
+    """保存一次检索到历史（元数据入 history.json，完整结果入 history/{id}.json）。"""
+    os.makedirs(HISTORY_DIR, exist_ok=True)
+    hid = uuid.uuid4().hex
+    try:
+        with open(os.path.join(HISTORY_DIR, f'{hid}.json'), 'w', encoding='utf-8') as f:
+            json.dump({'id': hid, **meta, 'occurrences': occurrences}, f,
+                      ensure_ascii=False)
+    except Exception:
+        return
+    h = get_history()
+    h.insert(0, {
+        'id': hid, 'time': meta.get('time', ''), 'index_name': meta['index_name'],
+        'segment': meta.get('segment'), 'sample': meta.get('sample', ''),
+        'hash_count': meta.get('hash_count', 0), 'count': len(occurrences),
+    })
+    while len(h) > HISTORY_MAX:
+        old = h.pop()
+        try:
+            os.remove(os.path.join(HISTORY_DIR, old['id'] + '.json'))
+        except OSError:
+            pass
+    save_history(h)
+
+
+@app.get('/api/history')
+def history_list():
+    return get_history()
+
+
+@app.get('/api/history/{hid}')
+def history_get(hid: str):
+    try:
+        with open(os.path.join(HISTORY_DIR, f'{hid}.json'), 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except OSError:
+        raise HTTPException(404, '历史记录不存在')
+
+
+@app.delete('/api/history/{hid}')
+def history_delete(hid: str):
+    h = get_history()
+    h = [x for x in h if x['id'] != hid]
+    save_history(h)
+    try:
+        os.remove(os.path.join(HISTORY_DIR, f'{hid}.json'))
+    except OSError:
+        pass
+    return {'ok': True}
+
+
 # ---------- 匹配 ----------
 
 
@@ -409,6 +470,11 @@ def do_match(m: MatchModel):
         o.update(name=name, path=path, file_duration=round(dur, 3))
         o['ratio'] = min(1.0, o['ratio'])  # 置信度上限 100%
         enriched.append(o)
+    add_history({
+        'time': time.strftime('%Y-%m-%d %H:%M:%S'),
+        'index_name': m.index_name, 'segment': seg_name,
+        'sample': m.sample, 'hash_count': len(hs),
+    }, enriched)
     return {
         'segment': seg_name, 'index_name': m.index_name,
         'hash_count': len(hs), 'occurrences': enriched,

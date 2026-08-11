@@ -1,12 +1,12 @@
 <template>
-  <div>
+  <div class="page">
     <h1 class="page-title">{{ t('favTitle') }}</h1>
 
     <div v-if="!favorites.length" class="empty">
       <FluentEmptyState icon="fluent:star-24-regular" :title="t('favEmpty')" />
     </div>
 
-    <div class="table-wrap">
+    <div class="table-wrap grow-area">
       <table class="result-table">
         <thead>
           <tr>
@@ -146,7 +146,8 @@ onMounted(load)
 <style scoped>
 .table-wrap {
   overflow: auto;
-  max-height: calc(100vh - 220px);
+  display: flex;
+  flex-direction: column;
   border-radius: 10px;
   border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
   background: var(--bg-card-solid, #fff);

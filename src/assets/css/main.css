@@ -6,26 +6,6 @@
   position: relative;
 }
 
-/* FluentNavigationView 选中指示器（npm 构建版缺失，按仓库源码补齐）+
-   悬停反馈与鼠标指针 */
-.fluent-navigation-view .menu-item {
-  cursor: pointer;
-}
-.fluent-navigation-view .menu-item.is-selected {
-  background: var(--bg-hover, rgba(0, 0, 0, 0.05));
-  color: var(--text-primary);
-}
-.fluent-navigation-view .menu-item.is-selected::before {
-  position: absolute;
-  left: -4px;
-  top: 10px;
-  width: 3px;
-  height: 16px;
-  border-radius: 2px;
-  background: var(--accent, #ea5ec1);
-  content: '';
-}
-
 @font-face {
   font-family: 'MiSans';
   src: url('../fonts/MiSans-Regular.ttf') format('truetype');
@@ -86,6 +66,18 @@ textarea {
   margin: 0 0 16px;
   font-size: 22px;
   font-weight: 600;
+}
+
+/* 占满可用区域的页面容器（弹性伸缩，内容不足时填满、超出时内部滚动） */
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.page .grow-area {
+  flex: 1;
+  min-height: 0;
 }
 
 /* 表单行 */
