@@ -31,9 +31,19 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().with_handler(|app, shortcut, _event| {
+            // F12 打开开发者工具（诊断用）
+            if shortcut.matches(tauri_plugin_global_shortcut::Modifiers::empty(),
+                                tauri_plugin_global_shortcut::Code::F12) {
+                if let Some(win) = app.get_webview_window("main") {
+                    let _ = win.open_devtools();
+                }
+            }
+        }).build())
         .setup(|app| {
             let handle = app.handle().clone();
             backend::setup(&handle);
+            let _ = app.global_shortcut().register("F12");
             // 尽早注入全局错误钩子（早于前端 bundle）：错误写入 localStorage + 上报后端，
             // 即使页面崩溃也能留痕，配合 DevTools(F12) 查看完整堆栈
             if let Some(win) = app.get_webview_window("main") {
