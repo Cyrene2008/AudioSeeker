@@ -2,6 +2,8 @@
 
 mod backend;
 
+use tauri::Manager;
+
 #[tauri::command]
 fn reveal_in_explorer(path: String) {
     let _ = std::process::Command::new("explorer")
@@ -20,6 +22,13 @@ fn backend_port() -> u16 {
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            // 二次启动：聚焦已有主窗口
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.show();
+                let _ = win.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {

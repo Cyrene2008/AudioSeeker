@@ -50,18 +50,22 @@ const bootDetail = computed(() => {
   const s = bootState.value
   const map = {
     starting: t('boot'),
-    downloadingpython: '正在下载 Python 运行时…',
+    downloadingpython: '正在下载 Python 运行时',
     extractingpython: '正在解压 Python 运行时…',
     installingpip: '正在安装 pip…',
     installingdeps: '正在安装 Python 依赖…',
     checkingffmpeg: '正在检查 ffmpeg…',
-    downloadingffmpeg: '正在下载 ffmpeg…',
+    downloadingffmpeg: '正在下载 ffmpeg',
     extractingffmpeg: '正在解压 ffmpeg…',
     startingbackend: '正在启动后端服务…',
     ready: t('bootReady'),
     error: s.error || t('bootError')
   }
-  return map[s.phase] || s.detail
+  const base = map[s.phase] || s.detail
+  if (s.progress > 0 && s.detail && s.phase !== 'ready') {
+    return `${base} · ${s.detail}`
+  }
+  return base
 })
 const bootProgress = computed(() => {
   const s = bootState.value
@@ -76,10 +80,6 @@ async function poll() {
   if (s) bootState.value = s
   if (s && s.ready) {
     clearInterval(timer)
-    try {
-      const win = (await import('@tauri-apps/api/window')).getCurrentWindow()
-      await win.show()
-    } catch { /* 浏览器模式 */ }
     try {
       loadSettingsFromBackend(await api.get('/api/settings'))
     } catch { /* ignore */ }
