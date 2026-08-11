@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+
+# Node / Vue
+node_modules/
+dist/
+dist-release/
+.vite/
+*.log
+
+# Rust / Tauri
+src-tauri/target/
+src-tauri/gen/
+
+# 索引数据（体积巨大，不入库）
+index/
+**/index/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.dat
+
+# 构建产物
+build-output/
+release/
+
+# 本地数据
+.local/
+.local.db
+favorites.json
+
+# IDE
+.vscode/
+.idea/
+*.suo
+
+# 系统
+Thumbs.db
+.DS_Store
