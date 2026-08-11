@@ -22,7 +22,8 @@
         "visible": true,
         "decorations": false,
         "resizable": true,
-        "backgroundColor": "#fdf5fa",`n        "devtools": true
+        "backgroundColor": "#fdf5fa",
+        "devtools": true
       }
     ],
     "security": {
