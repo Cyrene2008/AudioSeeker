@@ -375,6 +375,26 @@ def build_cancel():
         return {'ok': False, 'detail': '无进行中的任务'}
 
 
+# ---------- 前端错误上报（诊断用） ----------
+
+
+class ErrorLogModel(BaseModel):
+    message: str = ''
+    location: str = ''
+    stack: str = ''
+
+
+@app.post('/api/error-log')
+def error_log(m: ErrorLogModel):
+    try:
+        with open(os.path.join(DATA_DIR, 'error.log'), 'a', encoding='utf-8') as f:
+            f.write(f'[{time.strftime("%Y-%m-%d %H:%M:%S")}] {m.location}\n'
+                    f'{m.message}\n{m.stack}\n---\n')
+    except Exception:
+        pass
+    return {'ok': True}
+
+
 # ---------- 检索历史 ----------
 
 

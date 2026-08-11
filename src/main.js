@@ -8,15 +8,35 @@ import './assets/css/main.css'
 import App from './App.vue'
 import { settings, onSettingsChange } from './stores/settings'
 
-// 全局错误捕获：启动阶段（挂载前）的致命错误显示可见面板；挂载后的运行期错误只记日志
+// 全局错误捕获：启动阶段（挂载前）的致命错误显示可见面板；运行期错误上报后端日志
 let appMounted = false
 
+function reportError(msg, loc = '', stack = '') {
+  // 上报到后端 error.log（后端可用时）
+  try {
+    fetch(`http://127.0.0.1:${window.__CYRENE_PORT__ || 8765}/api/error-log`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: String(msg).slice(0, 2000),
+        location: String(loc).slice(0, 500),
+        stack: String(stack).slice(0, 3000)
+      })
+    }).catch(() => {})
+  } catch { /* ignore */ }
+}
+
 window.addEventListener('error', (e) => {
-  if (!appMounted) showFatalError(e.message || String(e.error))
+  const msg = e.message || String(e.error)
+  const loc = `${window.location.hash} @${e.filename || ''}:${e.lineno || ''}`
+  reportError(msg, loc, e.error && e.error.stack)
+  if (!appMounted) showFatalError(msg)
 })
 window.addEventListener('unhandledrejection', (e) => {
+  const msg = String(e.reason && e.reason.message ? e.reason.message : e.reason)
+  reportError(msg, window.location.hash, e.reason && e.reason.stack)
   if (!appMounted) {
-    showFatalError(String(e.reason && e.reason.message ? e.reason.message : e.reason))
+    showFatalError(msg)
   }
 })
 
@@ -79,7 +99,7 @@ const router = createRouter({
 
 const app = createApp(App)
 
-// Vue 渲染错误也接到全局错误面板（避免"白屏无提示"）
+// Vue 渲染错误也接到全局错误面板（避免"白屏无提示"），并上报后端日志
 app.config.errorHandler = (err, instance, info) => {
   let loc = ''
   try {
@@ -87,7 +107,9 @@ app.config.errorHandler = (err, instance, info) => {
     const comp = instance && instance.type && (instance.type.__name || instance.type.name)
     loc = `${route}${comp ? ` @${comp}` : ''}${info ? ` (${info})` : ''}`
   } catch { /* ignore */ }
-  showFatalError(`${err && err.message ? err.message : err}\n${loc}`)
+  const msg = err && err.message ? err.message : String(err)
+  reportError(msg, loc, err && err.stack)
+  showFatalError(`${msg}\n${loc}`)
 }
 
 app.use(router).mount('#app')

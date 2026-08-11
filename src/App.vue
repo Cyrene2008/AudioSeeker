@@ -10,12 +10,14 @@
             <div class="boot-bar-inner" :style="{ width: bootProgress + '%' }" />
           </div>
           <p v-if="bootState.phase === 'error'" class="boot-error">{{ bootState.error }}</p>
-          <FluentButton v-if="bootState.phase === 'error'" @click="location.reload()">
-            {{ t('refresh') }}
-          </FluentButton>
-          <FluentButton v-if="bootLong" appearance="subtle" style="margin-top: 10px" @click="skipBoot">
-            跳过等待，直接进入界面（后端将在后台继续启动）
-          </FluentButton>
+          <div v-if="bootState.phase === 'error'" class="boot-skip">
+            <FluentButton @click="location.reload()">{{ t('refresh') }}</FluentButton>
+          </div>
+          <div v-if="bootLong" class="boot-skip">
+            <FluentButton appearance="subtle" @click="skipBoot">
+              跳过等待，直接进入界面（后端将在后台继续启动）
+            </FluentButton>
+          </div>
         </div>
       </div>
     </template>
@@ -140,12 +142,20 @@ onUnmounted(() => {
 }
 .boot-card {
   width: 360px;
+  max-width: calc(100vw - 32px);
   text-align: center;
   padding: 36px 28px;
   border-radius: 18px;
   background: var(--bg-card-solid, #fff8fc);
   border: 1px solid var(--border-strong, rgba(234, 94, 193, 0.25));
   box-shadow: 0 12px 40px rgba(234, 94, 193, 0.18);
+  overflow: hidden;
+}
+.boot-skip {
+  margin-top: 12px;
+}
+.boot-skip :deep(button) {
+  width: 100%;
 }
 .boot-logo {
   width: 88px;

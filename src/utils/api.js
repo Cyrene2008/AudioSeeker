@@ -16,6 +16,7 @@ async function ensurePort() {
   portReady = (async () => {
     const p = await invoke('backend_port')
     if (p) port = p
+    window.__CYRENE_PORT__ = port
   })()
   await portReady
 }
