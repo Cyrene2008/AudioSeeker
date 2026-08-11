@@ -31,6 +31,7 @@ const TUNA_PYTHON_CANDIDATES: &[(&str, &str)] = &[
 ];
 
 const TUNA_PYPI: &str = "https://pypi.tuna.tsinghua.edu.cn/simple";
+const ALIYUN_PYPI: &str = "https://mirrors.aliyun.com/pypi/simple/";
 const GET_PIP_URL: &str = "https://bootstrap.pypa.io/get-pip.py";
 const FFMPEG_URL: &str = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip";
 
@@ -408,23 +409,21 @@ fn deps_ok(py: &Path) -> bool {
     cmd.status().map(|s| s.success()).unwrap_or(false)
 }
 
-fn install_deps(cn: bool, py: &Path, backend: &Path) -> Result<(), String> {
+fn install_deps(_cn: bool, py: &Path, backend: &Path) -> Result<(), String> {
     set_phase(Phase::InstallingDeps, "安装 Python 依赖");
     let req = backend.join("requirements.txt");
     if !req.is_file() {
         return Err("requirements.txt 不存在".into());
     }
-    // 镜像优先：默认/CN 各取首选，失败回退另一源
-    let indexes: [&str; 2] = if cn {
-        [TUNA_PYPI, "https://pypi.org/simple"]
-    } else {
-        ["https://pypi.org/simple", TUNA_PYPI]
-    };
+    // 镜像无条件优先（参考 QwenTTS：阿里云镜像默认），pypi.org 最后兜底。
+    // CN 探测不可靠（Windows 无 LANG），若先走 pypi.org 会因"慢而不失败"一直龟速。
+    let indexes: [&str; 3] = [TUNA_PYPI, ALIYUN_PYPI, "https://pypi.org/simple"];
     let mut last_err = String::from("依赖安装失败");
     for idx in indexes {
         let mut cmd = Command::new(py);
         cmd.args(["-m", "pip", "install", "-r", req.to_str().unwrap(),
-                  "-i", idx, "--timeout", "30"])
+                  "-i", idx, "--timeout", "30", "--retries", "2",
+                  "--disable-pip-version-check"])
             .stdout(Stdio::null())
             .stderr(Stdio::null());
         hide_window(&mut cmd);
