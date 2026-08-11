@@ -12,9 +12,11 @@
       :src="player.src"
       type="audio"
       :autoplay="true"
+      :loop="false"
       :title="player.title"
       :artist="player.subtitle"
-      :max-height="'120px'"
+      :height="'96px'"
+      :max-height="'96px'"
       :show-picture-in-picture="false"
     />
   </div>
@@ -35,10 +37,11 @@ const mpRef = ref(null)
   align-items: center;
   gap: 16px;
   flex-shrink: 0;
-  height: 84px;
-  padding: 8px 16px;
+  min-height: 72px;
+  padding: 6px 16px;
   border-top: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
   background: var(--bg-acrylic, #fff);
+  overflow: hidden;
 }
 .pb-info {
   display: flex;

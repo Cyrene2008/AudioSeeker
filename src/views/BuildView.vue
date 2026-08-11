@@ -164,12 +164,17 @@ async function startIncremental() {
 
 async function pollJob() {
   try {
+    const prev = job.value
     job.value = await api.get('/api/build/status')
     if (job.value.log) jobLog.value = job.value.log
+    const wasRunning = prev && prev.running
     if (job.value.running) {
       pollTimer = setTimeout(pollJob, 800)
     } else if (job.value.name) {
-      pushToast({ title: t('buildDone'), body: job.value.name })
+      // 仅在本次运行中由"进行中→完成"转变时提示一次，切页回来不再重复弹
+      if (wasRunning) {
+        pushToast({ title: t('buildDone'), body: job.value.name })
+      }
       loadIndexes()
     }
   } catch { /* ignore */ }

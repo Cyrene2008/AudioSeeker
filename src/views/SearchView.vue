@@ -43,7 +43,7 @@
             <th>{{ t('colRatio') }}</th>
             <th>{{ t('colDur') }}</th>
             <th>{{ t('indexName') }}</th>
-            <th style="width: 220px">{{ t('search') }}操作</th>
+            <th style="width: 220px">{{ t('colActions') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -52,20 +52,20 @@
               {{ busy ? t('searching') : (searched ? t('emptyResult') : t('noResult')) }}
             </td>
           </tr>
-          <tr v-for="(o, i) in occs" :key="i" :class="{ selected: selected.has(i) }" @click="toggleRow(i)">
-            <td><input type="checkbox" :checked="selected.has(i)" @click.stop="toggleRow(i)" /></td>
+          <tr v-for="(o, i) in occs" :key="i" :class="{ selected: selected.value.has(i) }" @click="toggleRow(i)">
+            <td><input type="checkbox" :checked="selected.value.has(i)" @click.stop="toggleRow(i)" /></td>
             <td class="mono">{{ i + 1 }}</td>
             <td>{{ o.name }}</td>
             <td class="mono">{{ fmt(o.offset_file) }}</td>
             <td class="mono">{{ fmt(o.tq0 * frameSec) }}–{{ fmt(o.tq1 * frameSec) }}</td>
             <td class="mono">{{ o.aligned }}</td>
-            <td class="mono">{{ (o.ratio * 100).toFixed(2) }}%</td>
+            <td class="mono">{{ Math.min(100, o.ratio * 100).toFixed(2) }}%</td>
             <td class="mono">{{ fmt(o.file_duration) }}</td>
             <td>{{ o.index_name || selectedIndex }}</td>
             <td @click.stop>
-              <FluentButton compact @click="playOcc(o)"><Icon icon="fluent:play-24-regular" :width="14" /></FluentButton>
-              <FluentButton compact @click="favoriteOcc(o)"><Icon icon="fluent:star-24-regular" :width="14" /></FluentButton>
-              <FluentButton compact @click="reveal(o)"><Icon icon="fluent:folder-open-16-regular" :width="14" /></FluentButton>
+              <FluentButton compact appearance="subtle" @click="playOcc(o)"><Icon icon="fluent:play-24-regular" :width="14" /></FluentButton>
+              <FluentButton compact appearance="subtle" @click="favoriteOcc(o)"><Icon icon="fluent:star-24-regular" :width="14" /></FluentButton>
+              <FluentButton compact appearance="subtle" @click="reveal(o)"><Icon icon="fluent:folder-open-16-regular" :width="14" /></FluentButton>
             </td>
           </tr>
         </tbody>
@@ -74,7 +74,7 @@
 
     <div class="action-bar">
       <FluentButton compact @click="selectAll"><Icon icon="fluent:checkmark-circle-24-regular" :width="15" /> {{ t('selectAll') }}</FluentButton>
-      <FluentButton compact @click="selected.clear()">{{ t('clearSel') }}</FluentButton>
+      <FluentButton compact @click="selected.value.clear()">{{ t('clearSel') }}</FluentButton>
       <FluentButton compact :disabled="!selected.size" @click="favoriteSelected"><Icon icon="fluent:star-add-24-regular" :width="15" /> {{ t('favorite') }}</FluentButton>
       <FluentButton compact :disabled="!selected.size" @click="exportSelected"><Icon icon="fluent:save-arrow-right-24-regular" :width="15" /> {{ t('exportSel') }}</FluentButton>
       <FluentButton compact :disabled="!occs.length" @click="exportAll"><Icon icon="fluent:library-24-regular" :width="15" /> {{ t('exportResult') }}</FluentButton>
@@ -83,19 +83,19 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, ref, toRefs } from 'vue'
 import {
   FluentButton, FluentComboBox, FluentInfoBar, FluentInput
 } from 'vue-fluent-widgets'
 import { Icon } from '@iconify/vue'
 import { t } from '../utils/i18n'
-import { api, audioUrl, pickFile, pickDir, savePath, tauri } from '../utils/api'
+import { api, audioUrl, pickFile, savePath, tauri } from '../utils/api'
 import { playTrack } from '../stores/player'
+import { searchState } from '../stores/search'
 import { pushToast } from '../components/ToastHost.vue'
 
 const frameSec = 256 / 11025
 
-const indexes = ref([])
 const indexItems = computed(() => {
   const items = []
   for (const idx of indexes.value) {
@@ -107,18 +107,9 @@ const indexItems = computed(() => {
   }
   return items
 })
-const selectedIndex = ref('')
-const sample = ref('')
-const fromS = ref(0)
-const toS = ref('')
-const minAligned = ref(8)
-const minRatio = ref('')
+const { indexes, selectedIndex, sample, fromS, toS, minAligned, minRatio,
+        occs, selected, lastMeta, searched } = toRefs(searchState)
 const busy = ref(false)
-const searched = ref(false)
-const lastMeta = ref(null)
-
-const occs = ref([])
-const selected = reactive(new Set())
 
 function fmt(s) {
   if (s === undefined || s === null || isNaN(s)) return '-'
@@ -170,7 +161,7 @@ async function doMatch() {
     const r = await api.post('/api/match', body)
     lastMeta.value = r
     occs.value = (r.occurrences || []).map((o) => ({ ...o, index_name: name, segment }))
-    selected.clear()
+    selected.value.clear()
     searched.value = true
   } catch (e) {
     pushToast({ title: t('searching'), body: e.message })
@@ -200,9 +191,9 @@ async function favoriteOcc(o) {
 }
 
 async function favoriteSelected() {
-  const list = [...selected].map((i) => occs.value[i]).filter(Boolean)
+  const list = [...selected.value].map((i) => occs.value[i]).filter(Boolean)
   for (const o of list) await favoriteOcc(o)
-  selected.clear()
+  selected.value.clear()
 }
 
 function reveal(o) {
@@ -211,21 +202,21 @@ function reveal(o) {
   }
 }
 
-const allSelected = computed(() => occs.value.length > 0 && selected.size === occs.value.length)
+const allSelected = computed(() => occs.value.length > 0 && selected.value.size === occs.value.length)
 function toggleAll() {
-  if (allSelected.value) selected.clear()
-  else occs.value.forEach((_, i) => selected.add(i))
+  if (allSelected.value) selected.value.clear()
+  else occs.value.forEach((_, i) => selected.value.add(i))
 }
 function toggleRow(i) {
-  if (selected.has(i)) selected.delete(i)
-  else selected.add(i)
+  if (selected.value.has(i)) selected.value.delete(i)
+  else selected.value.add(i)
 }
 function selectAll() {
-  occs.value.forEach((_, i) => selected.add(i))
+  occs.value.forEach((_, i) => selected.value.add(i))
 }
 
 async function exportSelected() {
-  await doExport([...selected].map((i) => occs.value[i]).filter(Boolean))
+  await doExport([...selected.value].map((i) => occs.value[i]).filter(Boolean))
 }
 
 async function exportAll() {

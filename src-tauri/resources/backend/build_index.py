@@ -240,6 +240,12 @@ def run_build(src_dir, out_dir, workers=0, recursive=False, target_ram_gb=0,
 
 
 def main():
+    # 日志统一 UTF-8（避免 Windows GBK 控制台编码导致乱码）
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
     ap = argparse.ArgumentParser(description='构建音频指纹索引（可断点续建）')
     ap.add_argument('audio_dir')
     ap.add_argument('--out', default='index')
@@ -270,8 +276,9 @@ def main():
         print(f'限制模式完成: {len(files)} 个文件')
         return
     if args.job:
+        files = iter_library_files(args.audio_dir, recursive=args.recursive)
         with open(args.job, 'w', encoding='utf-8') as f:
-            f.write(json.dumps(dict(started=True)) + '\n')
+            f.write(json.dumps(dict(started=True, total=len(files))) + '\n')
     run_build(args.audio_dir, args.out, workers=args.workers,
               recursive=args.recursive, target_ram_gb=args.ram_gb,
               progress_cb=progress_cb)

@@ -578,15 +578,21 @@ pub fn run_bootstrap(app: &tauri::AppHandle) {
     };
     let cn = is_cn_environment();
 
-    // 端口：默认 8765；已被占用时若健康检查通过则复用，否则找空闲端口
+    // 端口：默认 8765。占用时先做健康检查并比对版本：
+    //   版本一致 → 复用；不一致 → 杀掉残留旧后端（netstat 定位 PID）后重新启动
     let port = if port_in_use(DEFAULT_PORT) {
-        let health_ok = ureq::get(&format!("http://127.0.0.1:{DEFAULT_PORT}/api/health"))
-            .timeout(Duration::from_secs(2))
-            .call()
-            .is_ok();
-        if health_ok {
+        let health_url = format!("http://127.0.0.1:{DEFAULT_PORT}/api/health");
+        let stale = match ureq::get(&health_url).timeout(Duration::from_secs(2)).call() {
+            Ok(resp) if resp.status() == 200 => {
+                let body = resp.into_string().unwrap_or_default();
+                !body.contains(env!("CARGO_PKG_VERSION"))
+            }
+            _ => true,
+        };
+        if !stale {
             DEFAULT_PORT
         } else {
+            kill_process_on_port(DEFAULT_PORT);
             free_port()
         }
     } else {

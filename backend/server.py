@@ -291,9 +291,11 @@ def build_start(m: BuildStartModel):
         if m.recursive:
             cmd.append('--recursive')
         flags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+        env = dict(os.environ)
+        env['PYTHONIOENCODING'] = 'utf-8'  # 日志统一 UTF-8 避免 GBK 乱码
         log_f = open(log_file, 'w', encoding='utf-8')
         proc = subprocess.Popen(cmd, stdout=log_f, stderr=subprocess.STDOUT,
-                                creationflags=flags)
+                                creationflags=flags, env=env)
         _build_job = dict(
             name=m.name, src_dir=src, out_dir=out_dir, ram_gb=m.ram_gb,
             threads=m.threads, recursive=m.recursive,
@@ -317,6 +319,7 @@ def _read_progress(job):
                     continue
                 d = json.loads(line)
                 if 'started' in d:
+                    job['total'] = d.get('total', 0)
                     continue
                 job['last'] = d.get('name', '')
                 job['processed'] = d.get('processed', 0)
@@ -404,6 +407,7 @@ def do_match(m: MatchModel):
     for o in occs:
         fid, name, path, dur = by_id[o['file_id']]
         o.update(name=name, path=path, file_duration=round(dur, 3))
+        o['ratio'] = min(1.0, o['ratio'])  # 置信度上限 100%
         enriched.append(o)
     return {
         'segment': seg_name, 'index_name': m.index_name,

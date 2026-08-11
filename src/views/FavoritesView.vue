@@ -27,7 +27,7 @@
             <td>{{ f.index_name }}</td>
             <td class="mono">{{ fmt(f.offset) }}</td>
             <td class="mono">{{ fmt(f.span) }}</td>
-            <td class="mono">{{ (f.ratio * 100).toFixed(2) }}%</td>
+            <td class="mono">{{ Math.min(100, f.ratio * 100).toFixed(2) }}%</td>
             <td class="mono">{{ f.added_at }}</td>
             <td @click.stop>
               <FluentButton compact @click="play(f)"><Icon icon="fluent:play-24-regular" :width="14" /></FluentButton>
