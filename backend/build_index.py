@@ -1,23 +1,69 @@
-"""build_index.py - 并行构建指纹索引（SQLite 分片，支持断点续建）。
+"""build_index.py - 并行构建音频指纹索引（SQLite 分片，断点续建）。
 
 用法:
   python build_index.py <音频目录> --out <索引目录> [--workers N] [--limit N]
+                       [--recursive] [--ram-gb N] [--job <progress文件>]
+
+--ram-gb N: 按目标内存对音频分段建库（每段一个 seg_XXX 子目录，约 N GB 内存占用）。
+--job: 服务模式，进度以 JSON 行写入指定文件（供前端进度条轮询）。
 """
 
 import argparse
 import hashlib
+import json
 import multiprocessing as mp
 import os
 import sys
 import time
 
 import numpy as np
+import soundfile as sf
 
 import fp_core
-from fp_core import load_audio, extract_hashes, init_shard
+from fp_core import load_audio, extract_hashes, init_shard, iter_library_files
+
+# 经验换算：每行哈希约 32B 内存（h+fid+t+排序索引各 8B）
+BYTES_PER_HASH = 32.0
+# 平均哈希速率（哈希/秒音频）
+HASHES_PER_SEC_EST = 1000.0
 
 
-def process_files(shard_path, files, lock=None):
+def estimate_hashes(files):
+    """用文件头快速估计每个文件的总哈希量（不完整解码）。"""
+    out = []
+    for f in files:
+        try:
+            dur = sf.info(f).duration
+        except Exception:
+            dur = 4.0
+        out.append(int(dur * HASHES_PER_SEC_EST))
+    return out
+
+
+def split_segments(files, target_ram_gb):
+    """按目标内存把文件列表分成若干段。
+
+    每段预计占用 target_ram_gb GB 内存。返回 [seg_files, ...]。
+    target_ram_gb<=0 时返回单段（全量）。
+    """
+    if target_ram_gb <= 0 or len(files) <= 1:
+        return [files]
+    budget = int(target_ram_gb * (1 << 30) / BYTES_PER_HASH)
+    est = estimate_hashes(files)
+    segments, cur, cur_est = [], [], 0
+    for f, e in zip(files, est):
+        if cur and cur_est + e > budget:
+            segments.append(cur)
+            cur, cur_est = [], 0
+        cur.append(f)
+        cur_est += e
+    if cur:
+        segments.append(cur)
+    return segments
+
+
+def process_files(shard_path, files, events=None):
+    """处理一个分片的文件列表。events 为可选 mp.Queue：每文件发 (name, ok) 事件。"""
     stats = [0, 0, 0]  # ok, fail, skip
     con = None
     dat_f = None
@@ -32,6 +78,8 @@ def process_files(shard_path, files, lock=None):
             name = os.path.basename(f)
             if name in done:
                 stats[2] += 1
+                if events is not None:
+                    events.put((name, True))
                 continue
             try:
                 y = load_audio(f)
@@ -39,18 +87,15 @@ def process_files(shard_path, files, lock=None):
                 dur = y.size / fp_core.SR
             except Exception as e:
                 stats[1] += 1
-                if lock is not None:
-                    with lock:
-                        print(f'  FAIL  {f}: {e!r}', flush=True)
-                else:
-                    print(f'  FAIL  {f}: {e!r}', flush=True)
+                if events is not None:
+                    events.put((name, False))
+                print(f'  FAIL  {f}: {e!r}', flush=True)
                 continue
             cur = con.execute(
                 'INSERT INTO files(name,path,duration,status) VALUES(?,?,?,1)',
                 (name, f, dur))
             fid = (shard_id << 24) | cur.lastrowid  # 全局唯一 fid
-            con.execute('UPDATE files SET fid=? WHERE fid=?',
-                        (fid, cur.lastrowid))
+            con.execute('UPDATE files SET fid=? WHERE fid=?', (fid, cur.lastrowid))
             con.executemany('INSERT INTO hashes(h,fid,t) VALUES(?,?,?)',
                             ((int(h), fid, int(t)) for h, t in hs))
             if dat_f is not None and hs.size:
@@ -60,6 +105,8 @@ def process_files(shard_path, files, lock=None):
                 dat_f.write(packed.tobytes())
             con.commit()
             stats[0] += 1
+            if events is not None:
+                events.put((name, True))
     finally:
         if dat_f is not None:
             dat_f.close()
@@ -78,47 +125,24 @@ def sqlite3_connect(path):
 
 
 def worker_entry(args):
-    shard_path, files, lock = args
-    return process_files(shard_path, files, lock)
+    shard_path, files, events = args
+    return process_files(shard_path, files, events)
 
 
-def main():
-    ap = argparse.ArgumentParser(description='构建音频指纹索引（可断点续建）')
-    ap.add_argument('audio_dir', help='包含 wav 的目录（递归）')
-    ap.add_argument('--out', default='index', help='索引输出目录')
-    ap.add_argument('--workers', type=int, default=0,
-                    help='并行进程数（默认 min(10, cpu-2)）')
-    ap.add_argument('--limit', type=int, default=0, help='只处理前 N 个文件（调试用）')
-    ap.add_argument('--reindex', action='store_true', help='忽略已有状态强制重做')
-    args = ap.parse_args()
-
-    files = fp_core.iter_library_files(args.audio_dir)
-    if args.limit:
-        files = files[:args.limit]
-    if not files:
-        print('未找到 wav 文件')
-        sys.exit(1)
-
-    n_workers = args.workers or min(10, max(2, (os.cpu_count() or 4) - 2))
-    os.makedirs(args.out, exist_ok=True)
-    shards = [os.path.join(args.out, f'shard_{i}.sqlite') for i in range(n_workers)]
+def build_one_segment(files, out_dir, workers, events, log):
+    """构建一个段（out_dir 即段目录，含 shard_*.sqlite）。返回 (ok, fail, skip)。"""
+    n_workers = workers or min(10, max(2, (os.cpu_count() or 4) - 2))
+    os.makedirs(out_dir, exist_ok=True)
+    shards = [os.path.join(out_dir, f'shard_{i}.sqlite') for i in range(n_workers)]
     for s in shards:
         init_shard(s)
-
     per_shard = [[] for _ in range(n_workers)]
     for f in files:
         idx = int(hashlib.md5(f.encode('utf-8', 'surrogatepass')).hexdigest(), 16) % n_workers
         per_shard[idx].append(f)
-
-    t0 = time.time()
-    mp.set_start_method('spawn', force=True)
-    manager = mp.Manager() if n_workers > 1 else None
-    lock = manager.Lock() if manager is not None else None
+    tasks = [(shards[i], per_shard[i], events) for i in range(n_workers) if per_shard[i]]
     pool = mp.Pool(n_workers)
-    tasks = [(shards[i], per_shard[i], lock) for i in range(n_workers)
-             if per_shard[i]]
     ok = fail = skip = 0
-    done_files = set()
     for shard_path, stats in pool.imap_unordered(worker_entry, tasks):
         ok += stats[0]
         fail += stats[1]
@@ -127,18 +151,130 @@ def main():
         con.execute('CREATE INDEX IF NOT EXISTS ix_h ON hashes(h)')
         con.execute('VACUUM')
         con.close()
-        print(f'  [{os.path.basename(shard_path)}] 完成, 累计 '
-              f'新增 {ok} 失败 {fail} 跳过 {skip}', flush=True)
     pool.close()
     pool.join()
+    log(f'  段 {os.path.basename(out_dir)} 完成: 新增 {ok}, 失败 {fail}, 跳过 {skip}')
+    return ok, fail, skip
+
+
+def _event_drainer(events, progress_cb, total, stop):
+    """后台线程：从队列取逐文件事件，更新进度回调。"""
+    done = failed = skipped = 0
+    last = ['']
+    while not stop.is_set():
+        try:
+            name, ok = events.get(timeout=0.2)
+        except Exception:
+            continue
+        if ok:
+            done += 1
+        else:
+            failed += 1
+        last[0] = name
+        progress_cb(last[0], done + failed + skipped, total, done, failed, skipped)
+    # 排空剩余
+    while True:
+        try:
+            name, ok = events.get_nowait()
+        except Exception:
+            break
+        if ok:
+            done += 1
+        else:
+            failed += 1
+        last[0] = name
+    progress_cb(last[0], done + failed + skipped, total, done, failed, skipped)
+
+
+def run_build(src_dir, out_dir, workers=0, recursive=False, target_ram_gb=0,
+              progress_cb=None, log=print):
+    """构建索引主入口（CLI 与服务模式共用）。
+
+    progress_cb(name, processed, total, done, failed, skipped)
+    返回 (ok, fail, skip, total_hashes)。
+    """
+    t0 = time.time()
+    files = iter_library_files(src_dir, recursive=recursive)
+    if not files:
+        log('未找到 wav 文件')
+        return 0, 0, 0, 0
+
+    total = len(files)
+    events = mp.Manager().Queue() if progress_cb else None
+    stop = mp.Manager().Event() if progress_cb else None
+    drainer = None
+    if progress_cb:
+        import threading
+        drainer = threading.Thread(
+            target=_event_drainer, args=(events, progress_cb, total, stop), daemon=True)
+        drainer.start()
+
+    ok = fail = skip = 0
+    segments = split_segments(files, target_ram_gb)
+    log(f'共 {total} 个文件, 分为 {len(segments)} 段, 线程 {workers or "auto"}')
+    for i, seg_files in enumerate(segments):
+        if len(segments) > 1:
+            seg_dir = os.path.join(out_dir, f'seg_{i:03d}')
+            log(f'== 段 {i+1}/{len(segments)}: {len(seg_files)} 个文件')
+        else:
+            seg_dir = out_dir
+        so, sf_, sk = build_one_segment(seg_files, seg_dir, workers, events, log)
+        ok += so
+        fail += sf_
+        skip += sk
+
+    if stop is not None:
+        stop.set()
+        drainer.join(timeout=5)
 
     total_hashes = 0
-    for s in shards:
-        con = sqlite3_connect(s)
-        total_hashes += con.execute('SELECT COUNT(*) FROM hashes').fetchone()[0]
-        con.close()
-    print(f'完成: {ok} 个文件新增, {fail} 个失败, {skip} 个已存在, '
-          f'共 {total_hashes:,} 条哈希, 耗时 {time.time()-t0:.1f}s')
+    for dirpath, _, fnames in os.walk(out_dir):
+        for fn in fnames:
+            if fn.startswith('shard_') and fn.endswith('.sqlite'):
+                con = sqlite3_connect(os.path.join(dirpath, fn))
+                total_hashes += con.execute('SELECT COUNT(*) FROM hashes').fetchone()[0]
+                con.close()
+    log(f'完成: {ok} 新增, {fail} 失败, {skip} 已存在, '
+        f'共 {total_hashes:,} 条哈希, 耗时 {time.time()-t0:.1f}s')
+    return ok, fail, skip, total_hashes
+
+
+def main():
+    ap = argparse.ArgumentParser(description='构建音频指纹索引（可断点续建）')
+    ap.add_argument('audio_dir')
+    ap.add_argument('--out', default='index')
+    ap.add_argument('--workers', type=int, default=0, help='并行进程数（默认 auto）')
+    ap.add_argument('--limit', type=int, default=0, help='只处理前 N 个文件（调试用）')
+    ap.add_argument('--recursive', action='store_true', help='递归扫描子目录')
+    ap.add_argument('--ram-gb', type=float, default=0, help='目标段内存(GB)，>0 时按内存分段')
+    ap.add_argument('--job', default=None, help='服务模式：进度写入此 JSONL 文件')
+    args = ap.parse_args()
+
+    def progress_cb(name, processed, total, done, failed, skipped):
+        if args.job:
+            with open(args.job, 'a', encoding='utf-8') as f:
+                f.write(json.dumps(dict(
+                    name=name, processed=processed, total=total,
+                    done=done, failed=failed, skipped=skipped)) + '\n')
+        else:
+            print(f'  [{processed}/{total}] {name}', flush=True)
+
+    mp.set_start_method('spawn', force=True)
+    if args.limit:
+        files = iter_library_files(args.audio_dir, recursive=args.recursive)[:args.limit]
+        # 限制模式直接走 process_files
+        os.makedirs(args.out, exist_ok=True)
+        s = os.path.join(args.out, 'shard_0.sqlite')
+        init_shard(s)
+        process_files(s, files)
+        print(f'限制模式完成: {len(files)} 个文件')
+        return
+    if args.job:
+        with open(args.job, 'w', encoding='utf-8') as f:
+            f.write(json.dumps(dict(started=True)) + '\n')
+    run_build(args.audio_dir, args.out, workers=args.workers,
+              recursive=args.recursive, target_ram_gb=args.ram_gb,
+              progress_cb=progress_cb)
 
 
 if __name__ == '__main__':
