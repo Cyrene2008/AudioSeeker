@@ -9,7 +9,7 @@ import { currentVersion } from '../utils/updater'
 
 defineProps({
   version: { type: String, default: () => currentVersion() },
-  build: { type: String, default: () => BUILD_COMMIT }
+  build: { type: String, default: () => __BUILD_COMMIT__ }
 })
 </script>
 

@@ -128,7 +128,9 @@ function fmt(s) {
 }
 
 async function loadIndexes() {
-  indexes.value = await api.get('/api/indexes')
+  try {
+    indexes.value = await api.get('/api/indexes')
+  } catch { /* 后端未就绪时静默 */ }
   if (!selectedIndex.value && indexItems.value.length) {
     selectedIndex.value = indexItems.value[0].value
   }

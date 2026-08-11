@@ -71,7 +71,9 @@ function fmt(s) {
 }
 
 async function load() {
-  favorites.value = await api.get('/api/favorites')
+  try {
+    favorites.value = await api.get('/api/favorites')
+  } catch { /* 后端未就绪时静默 */ }
   selected.clear()
 }
 

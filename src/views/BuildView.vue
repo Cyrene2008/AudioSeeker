@@ -126,7 +126,9 @@ async function pickSrc() {
 }
 
 async function loadIndexes() {
-  indexes.value = await api.get('/api/indexes')
+  try {
+    indexes.value = await api.get('/api/indexes')
+  } catch { /* 后端未就绪时静默 */ }
   if (!incIndex.value && incItems.value.length) incIndex.value = incItems.value[0].value
 }
 

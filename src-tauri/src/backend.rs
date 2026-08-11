@@ -24,10 +24,10 @@ const PYTHON_CANDIDATES: &[(&str, &str)] = &[
     ("20240224", "cpython-3.10.13+20240224-x86_64-pc-windows-msvc-shared-install_only.tar.gz"),
 ];
 const PYTHON_GITHUB: &str = "https://github.com/indygreg/python-build-standalone/releases/download";
-/// 清华 TUNA 镜像的 python.org 官方 Windows 安装包（含 pip）
-const TUNA_PYTHON_CANDIDATES: &[(&str, &str)] = &[
-    ("3.12.7", "python-3.12.7-amd64.exe"),
-    ("3.11.9", "python-3.11.9-amd64.exe"),
+/// 清华 TUNA 镜像的 python.org 官方文件（embeddable zip 纯解压零窗口；exe 安装包为后备）
+const TUNA_PYTHON_CANDIDATES: &[(&str, &str, &str)] = &[
+    ("3.12.7", "python-3.12.7-embed-amd64.zip", "python-3.12.7-amd64.exe"),
+    ("3.11.9", "python-3.11.9-embed-amd64.zip", "python-3.11.9-amd64.exe"),
 ];
 
 const TUNA_PYPI: &str = "https://pypi.tuna.tsinghua.edu.cn/simple";
@@ -262,6 +262,59 @@ fn extract_tar_gz(archive: &Path, dest: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// 解压 zip 的全部内容到 dest。
+fn extract_zip_all(archive: &Path, dest: &Path) -> Result<(), String> {
+    let f = std::fs::File::open(archive).map_err(|e| e.to_string())?;
+    let mut z = zip::ZipArchive::new(f).map_err(|e| e.to_string())?;
+    for i in 0..z.len() {
+        let mut entry = z.by_index(i).map_err(|e| e.to_string())?;
+        let name = entry.name().to_string().replace('\\', "/");
+        let target = dest.join(&name);
+        if name.ends_with('/') {
+            std::fs::create_dir_all(&target).map_err(|e| e.to_string())?;
+            continue;
+        }
+        if let Some(parent) = target.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        let mut out = std::fs::File::create(&target).map_err(|e| e.to_string())?;
+        std::io::copy(&mut entry, &mut out).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+/// 修补 embeddable python 的 ._pth：启用 site + site-packages（否则 pip 无法使用）
+fn patch_embeddable_pth(env_dir: &Path, ver: &str) -> Result<(), String> {
+    let parts: Vec<&str> = ver.split('.').collect();
+    if parts.len() < 2 {
+        return Ok(());
+    }
+    let pth = env_dir.join(format!("python{}{}._pth", parts[0], parts[1]));
+    if !pth.is_file() {
+        return Ok(());
+    }
+    let content = std::fs::read_to_string(&pth).map_err(|e| e.to_string())?;
+    let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+    let mut changed = false;
+    if !lines.iter().any(|l| l.trim() == "Lib\\site-packages") {
+        // 在 "." 之后插入 site-packages 路径
+        if let Some(idx) = lines.iter().position(|l| l.trim() == ".") {
+            lines.insert(idx + 1, "Lib\\site-packages".to_string());
+            changed = true;
+        }
+    }
+    for l in lines.iter_mut() {
+        if l.trim() == "#import site" {
+            *l = "import site".to_string();
+            changed = true;
+        }
+    }
+    if changed {
+        std::fs::write(&pth, lines.join("\n") + "\n").map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 fn extract_ffmpeg_zip(archive: &Path, dest: &Path) -> Result<(), String> {
     let f = std::fs::File::open(archive).map_err(|e| e.to_string())?;
     let mut z = zip::ZipArchive::new(f).map_err(|e| e.to_string())?;
@@ -302,42 +355,58 @@ fn ensure_python(_cn: bool, app_dir: &Path, exe_dir: &Path) -> Result<PathBuf, S
     let env_dir = py.parent().unwrap_or(exe_dir).to_path_buf();
     std::fs::create_dir_all(&env_dir).map_err(|e| e.to_string())?;
 
-    // 方案一（优先）：清华 TUNA 镜像的 python.org 官方安装包（国内直连，自带 pip）
+    // 方案一（优先）：清华 TUNA 镜像的 embeddable zip（纯解压零窗口）
     set_phase(Phase::DownloadingPython, "下载 Python 运行时（清华镜像）");
     let mut last_err = String::from("Python 安装失败");
-    for (ver, asset) in TUNA_PYTHON_CANDIDATES {
-        let url = format!("https://mirrors.tuna.tsinghua.edu.cn/python/{ver}/{asset}");
-        let tmp = env_dir.join(format!("python_setup_{ver}.exe"));
-        match download(&url, &tmp, |got, total| {
+    for (ver, zip_asset, exe_asset) in TUNA_PYTHON_CANDIDATES {
+        // 1a) embeddable zip：解压 + 修补 _pth，完全无窗口
+        let zip_url = format!(
+            "https://mirrors.tuna.tsinghua.edu.cn/python/{ver}/{zip_asset}");
+        let tmp_zip = env_dir.join(format!("python_embed_{ver}.zip"));
+        if download(&zip_url, &tmp_zip, |got, total| {
+            let p = if total > 0 { got as f32 / total as f32 } else { 0.0 };
+            set_progress(p * 0.5, format!("下载 Python ({got}/{total} 字节)"));
+        }).is_ok() {
+            set_phase(Phase::ExtractingPython, "解压 Python 运行时");
+            match extract_zip_all(&tmp_zip, &env_dir) {
+                Ok(()) => {
+                    let _ = std::fs::remove_file(&tmp_zip);
+                    let _ = patch_embeddable_pth(&env_dir, ver);
+                    if py.is_file() {
+                        return Ok(py);
+                    }
+                }
+                Err(e) => last_err = e,
+            }
+        }
+
+        // 1b) 回退：官方 exe 安装包静默安装（个别系统会闪窗，故作为后备）
+        let exe_url = format!(
+            "https://mirrors.tuna.tsinghua.edu.cn/python/{ver}/{exe_asset}");
+        let tmp_exe = env_dir.join(format!("python_setup_{ver}.exe"));
+        if download(&exe_url, &tmp_exe, |got, total| {
             let p = if total > 0 { got as f32 / total as f32 } else { 0.0 };
             set_progress(p * 0.6, format!("下载 Python ({got}/{total} 字节)"));
-        }) {
-            Ok(()) => {}
-            Err(e) => {
-                last_err = e;
-                let _ = std::fs::remove_file(&tmp);
-                continue;
+        }).is_ok() {
+            set_phase(Phase::ExtractingPython, "静默安装 Python 运行时");
+            let mut cmd = Command::new(&tmp_exe);
+            cmd.args([
+                "/quiet", "InstallAllUsers=0", "PrependPath=0",
+                "Include_launcher=0", "Include_test=0", "Include_doc=0",
+                "Include_tcltk=0", "Include_pip=1",
+                "TargetDir=", env_dir.to_str().unwrap_or(""),
+            ]);
+            hide_window(&mut cmd);
+            let _ = cmd.status();
+            let _ = std::fs::remove_file(&tmp_exe);
+            for _ in 0..90 {
+                if py.is_file() {
+                    return Ok(py);
+                }
+                std::thread::sleep(Duration::from_secs(1));
             }
+            last_err = format!("静默安装超时（{ver}）");
         }
-        set_phase(Phase::ExtractingPython, "静默安装 Python 运行时");
-        let mut cmd = Command::new(&tmp);
-        cmd.args([
-            "/quiet", "InstallAllUsers=0", "PrependPath=0",
-            "Include_launcher=0", "Include_test=0", "Include_doc=0",
-            "Include_tcltk=0", "Include_pip=1",
-            "TargetDir=", env_dir.to_str().unwrap_or(""),
-        ]);
-        hide_window(&mut cmd);
-        let _ = cmd.status();
-        let _ = std::fs::remove_file(&tmp);
-        // 安装器可能异步收尾，轮询 python.exe
-        for _ in 0..90 {
-            if py.is_file() {
-                return Ok(py);
-            }
-            std::thread::sleep(Duration::from_secs(1));
-        }
-        last_err = format!("静默安装超时（{ver}）");
     }
 
     // 方案二（回退）：python-build-standalone tar.gz（多镜像 → 原地址）
