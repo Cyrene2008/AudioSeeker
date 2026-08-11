@@ -23,12 +23,12 @@
         <tbody>
           <tr v-for="(f, i) in favorites" :key="f.id" :class="{ selected: selected.has(i) }" @click="toggleRow(i)">
             <td><input type="checkbox" :checked="selected.has(i)" @click.stop="toggleRow(i)" /></td>
-            <td>{{ f.name }}</td>
-            <td>{{ f.index_name }}</td>
-            <td class="mono">{{ fmt(f.offset) }}</td>
-            <td class="mono">{{ fmt(f.span) }}</td>
-            <td class="mono">{{ Math.min(100, f.ratio * 100).toFixed(2) }}%</td>
-            <td class="mono">{{ f.added_at }}</td>
+            <td>{{ f?.name }}</td>
+            <td>{{ f?.index_name }}</td>
+            <td class="mono">{{ fmt(f?.offset) }}</td>
+            <td class="mono">{{ fmt(f?.span) }}</td>
+            <td class="mono">{{ Math.min(100, (f?.ratio || 0) * 100).toFixed(2) }}%</td>
+            <td class="mono">{{ f?.added_at }}</td>
             <td @click.stop>
               <FluentButton compact @click="play(f)"><Icon icon="fluent:play-24-regular" :width="14" /></FluentButton>
               <FluentButton compact @click="exportOne(f)"><Icon icon="fluent:save-arrow-right-24-regular" :width="14" /></FluentButton>
@@ -80,7 +80,7 @@ async function load() {
 function play(f) {
   playTrack({
     title: f.name,
-    subtitle: `${f.index_name} · ${t('colOffset')} ${fmt(f.offset)}`,
+    subtitle: `${f.index_name} · ${t('colOffset')} ${fmt(f?.offset)}`,
     src: audioUrl(f.path, f.offset, Math.max(f.span, 3))
   })
 }

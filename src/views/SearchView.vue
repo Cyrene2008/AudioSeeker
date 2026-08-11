@@ -59,13 +59,13 @@
           <tr v-for="(o, i) in occs" :key="i" :class="{ selected: selected.has(i) }" @click="toggleRow(i)">
             <td><input type="checkbox" :checked="selected.has(i)" @click.stop="toggleRow(i)" /></td>
             <td class="mono">{{ i + 1 }}</td>
-            <td>{{ o.name }}</td>
-            <td class="mono">{{ fmt(o.offset_file) }}</td>
-            <td class="mono">{{ fmt(o.tq0 * frameSec) }}–{{ fmt(o.tq1 * frameSec) }}</td>
-            <td class="mono">{{ o.aligned }}</td>
-            <td class="mono">{{ Math.min(100, o.ratio * 100).toFixed(2) }}%</td>
-            <td class="mono">{{ fmt(o.file_duration) }}</td>
-            <td>{{ o.index_name || selectedIndex }}</td>
+            <td>{{ o?.name }}</td>
+            <td class="mono">{{ fmt(o?.offset_file) }}</td>
+            <td class="mono">{{ fmt(o?.tq0 * frameSec) }}–{{ fmt(o?.tq1 * frameSec) }}</td>
+            <td class="mono">{{ o?.aligned }}</td>
+            <td class="mono">{{ Math.min(100, (o?.ratio || 0) * 100).toFixed(2) }}%</td>
+            <td class="mono">{{ fmt(o?.file_duration) }}</td>
+            <td>{{ (o?.index_name || selectedIndex) }}</td>
             <td @click.stop>
               <FluentButton compact appearance="subtle" @click="playOcc(o)"><Icon icon="fluent:play-24-regular" :width="14" /></FluentButton>
               <FluentButton compact appearance="subtle" @click="favoriteOcc(o)"><Icon icon="fluent:star-24-regular" :width="14" /></FluentButton>
@@ -105,9 +105,9 @@
           <tbody>
             <tr v-for="h in historyList" :key="h.id">
               <td class="mono" style="max-width: 320px; overflow: hidden; text-overflow: ellipsis">{{ basename(h.sample) }}</td>
-              <td>{{ h.index_name }}{{ h.segment ? ' / ' + h.segment : '' }}</td>
-              <td class="mono">{{ h.count }}</td>
-              <td class="mono">{{ h.time }}</td>
+              <td>{{ h?.index_name }}{{ h?.segment ? ' / ' + h.segment : '' }}</td>
+              <td class="mono">{{ h?.count }}</td>
+              <td class="mono">{{ h?.time }}</td>
               <td>
                 <FluentButton compact appearance="subtle" @click="loadHistory(h)">
                   <Icon icon="fluent:play-24-regular" :width="14" /> {{ t('loadHistory') }}
@@ -258,7 +258,7 @@ async function doMatch() {
 function playOcc(o) {
   playTrack({
     title: o.name,
-    subtitle: `${t('colOffset')} ${fmt(o.offset_file)}`,
+    subtitle: `${t('colOffset')} ${fmt(o?.offset_file)}`,
     src: audioUrl(o.path, o.offset_file, Math.max(o.span, 3))
   })
 }
@@ -266,7 +266,7 @@ function playOcc(o) {
 async function favoriteOcc(o) {
   try {
     await api.post('/api/favorites', {
-      name: o.name, path: o.path, index_name: o.index_name || selectedIndex.value,
+      name: o.name, path: o.path, index_name: (o?.index_name || selectedIndex).value,
       offset: o.offset_file, span: o.span, aligned: o.aligned, ratio: o.ratio
     })
     pushToast({ title: t('favAdded'), body: o.name })

@@ -18,19 +18,19 @@
       <div v-for="idx in indexes" :key="idx.name" class="idx-card">
         <div class="idx-head">
           <div>
-            <div class="idx-name">{{ idx.name }}</div>
-            <div class="idx-path mono">{{ idx.path }}</div>
+            <div class="idx-name">{{ idx?.name }}</div>
+            <div class="idx-path mono">{{ idx?.path }}</div>
           </div>
           <FluentButton compact appearance="accent" @click="remove(idx)">
             <Icon icon="fluent:delete-24-regular" :width="15" />
           </FluentButton>
         </div>
         <div class="idx-stats">
-          <span><b>{{ idx.segments.length }}</b> {{ t('segments') }}</span>
-          <span><b class="mono">{{ fmtCount(idx.total_hashes) }}</b> {{ t('hashes') }}</span>
-          <span><b class="mono">{{ fmtSize(idx.segments.reduce((s, x) => s + x.size, 0)) }}</b> {{ t('size') }}</span>
+          <span><b>{{ (idx?.segments?.length || 0) }}</b> {{ t('segments') }}</span>
+          <span><b class="mono">{{ fmtCount(idx?.total_hashes) }}</b> {{ t('hashes') }}</span>
+          <span><b class="mono">{{ fmtSize((idx?.segments || []).reduce((s, x) => s + (x?.size || 0), 0)) }}</b> {{ t('size') }}</span>
         </div>
-        <div v-if="idx.segments.length > 1" class="seg-list">
+        <div v-if="(idx?.segments?.length || 0) > 1" class="seg-list">
           <div v-for="s in idx.segments" :key="s.name" class="seg-row mono">
             {{ s.name }} · {{ s.files }} {{ t('files') }} · {{ fmtCount(s.hashes) }} {{ t('hashes') }}
           </div>
