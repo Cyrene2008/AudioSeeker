@@ -447,6 +447,14 @@ def do_export(m: ExportModel):
             by_id[row[0]] = row
     occs = []
     for o in m.occurrences:
+        if 'path' in o and o.get('file_id', 0) in (0, -1):
+            # 收藏直出：按路径
+            occs.append(dict(
+                file_id=0, name=os.path.basename(o['path']), path=o['path'],
+                file_duration=0.0, offset_file=o['offset_file'], span=o['span'],
+                tq0=int(o.get('tq0', 0)), tq1=int(o.get('tq1', 0)),
+                aligned=o.get('aligned', 0), ratio=o.get('ratio', 0)))
+            continue
         fid, name, path, dur = by_id[int(o['file_id'])]
         occs.append(dict(
             file_id=fid, name=name, path=path, file_duration=dur,
