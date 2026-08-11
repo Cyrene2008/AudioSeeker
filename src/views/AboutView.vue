@@ -1,7 +1,9 @@
 <template>
   <div class="about">
     <div class="about-card">
-      <div class="about-logo">🔊</div>
+      <div class="about-logo">
+        <Icon icon="fluent:headphones-sound-wave-24-filled" :width="56" />
+      </div>
       <h1>Cyreneの音频检索器</h1>
       <div class="about-ver mono">v{{ version }}</div>
       <p class="about-desc">{{ t('ackLibs') }}</p>
@@ -68,7 +70,17 @@ async function doCheck() {
   border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
   background: var(--bg-card-solid, #fff);
 }
-.about-logo { font-size: 52px; }
+.about-logo {
+  width: 84px;
+  height: 84px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ff6fb0, #ea5ec1);
+  color: #fff;
+}
 .about-card h1 { margin: 12px 0 4px; font-size: 22px; }
 .about-ver { color: var(--text-secondary); font-size: 13px; }
 .about-desc { margin: 18px 0; font-size: 13px; color: var(--text-secondary); line-height: 1.6; }

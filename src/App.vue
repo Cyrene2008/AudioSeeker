@@ -3,7 +3,9 @@
     <template v-if="bootState.phase !== 'ready'">
       <div class="boot-overlay">
         <div class="boot-card">
-          <div class="boot-logo">🔊</div>
+          <div class="boot-logo">
+            <Icon icon="fluent:headphones-sound-wave-24-filled" :width="64" />
+          </div>
           <h2>{{ t('appName') }}</h2>
           <p class="boot-detail">{{ bootDetail }}</p>
           <div class="boot-bar">
@@ -35,6 +37,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { FluentButton } from 'vue-fluent-widgets'
+import { Icon } from '@iconify/vue'
 import TitleBar from './components/layout/TitleBar.vue'
 import Dock from './components/layout/Dock.vue'
 import PlayerBar from './components/layout/PlayerBar.vue'
@@ -107,38 +110,54 @@ onUnmounted(() => clearInterval(timer))
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-base, #fdf5fa);
+  background: linear-gradient(160deg, #ffd9ec 0%, #fdf5fa 45%, #ffcfe8 100%);
   z-index: 999;
 }
+.dark .boot-overlay {
+  background: linear-gradient(160deg, #2d1a25 0%, #3a2232 55%, #24131e 100%);
+}
 .boot-card {
-  width: 340px;
+  width: 360px;
   text-align: center;
+  padding: 36px 28px;
+  border-radius: 18px;
+  background: var(--bg-card-solid, #fff8fc);
+  border: 1px solid var(--border-strong, rgba(234, 94, 193, 0.25));
+  box-shadow: 0 12px 40px rgba(234, 94, 193, 0.18);
 }
 .boot-logo {
-  font-size: 44px;
-  margin-bottom: 8px;
+  width: 88px;
+  height: 88px;
+  margin: 0 auto 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ff6fb0, #ea5ec1);
+  color: #fff;
 }
 .boot-card h2 {
   margin: 0 0 12px;
   font-size: 20px;
+  color: var(--text-primary, #3d1a2e);
 }
 .boot-detail {
   margin: 0 0 14px;
-  color: var(--text-secondary, #666);
+  color: var(--text-secondary, #6b3a55);
   font-size: 13px;
   min-height: 18px;
 }
 .boot-bar {
   height: 6px;
   border-radius: 3px;
-  background: var(--bg-hover, rgba(0, 0, 0, 0.08));
+  background: var(--bg-hover, rgba(234, 94, 193, 0.15));
   overflow: hidden;
   margin-bottom: 10px;
 }
 .boot-bar-inner {
   height: 100%;
   border-radius: 3px;
-  background: var(--accent, #ff69a0);
+  background: linear-gradient(90deg, #ff6fb0, #ea5ec1);
   transition: width 0.3s;
 }
 .boot-error {

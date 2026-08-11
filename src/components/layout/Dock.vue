@@ -1,7 +1,9 @@
 <template>
   <nav class="dock" :class="{ collapsed: hamburgerOpen }">
     <div class="dock-top">
-      <span class="dock-logo">🔊</span>
+      <span class="dock-logo">
+        <Icon icon="fluent:headphones-sound-wave-24-filled" :width="24" />
+      </span>
       <span v-if="!hamburgerOpen" class="dock-logo-text">Cyrene<br /><small>音频检索器</small></span>
     </div>
     <div class="dock-items">
@@ -61,7 +63,17 @@ const mainItems = computed(() => [
   border-bottom: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
   overflow: hidden;
 }
-.dock-logo { font-size: 22px; flex-shrink: 0; }
+.dock-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #ff6fb0, #ea5ec1);
+  color: #fff;
+}
 .dock-logo-text {
   font-size: 13px;
   font-weight: 600;
@@ -100,7 +112,7 @@ const mainItems = computed(() => [
   transition: background 0.15s, color 0.15s;
 }
 .dock-item:hover { background: var(--bg-hover, rgba(0, 0, 0, 0.05)); color: var(--text-primary); }
-.dock-item.active { background: var(--accent-soft, rgba(255, 105, 160, 0.14)); color: var(--accent, #ff69a0); }
+.dock-item.active { background: var(--accent-soft, rgba(255, 105, 160, 0.14)); color: var(--accent, #ea5ec1); }
 .dock.collapsed .dock-item { justify-content: center; padding: 8px 0; }
 .dock-item-icon { flex-shrink: 0; }
 .dock-item-label { overflow: hidden; text-overflow: ellipsis; }

@@ -24,7 +24,7 @@ const PYTHON_CANDIDATES: &[(&str, &str)] = &[
     ("20240224", "cpython-3.10.13+20240224-x86_64-pc-windows-msvc-shared-install_only.tar.gz"),
 ];
 const PYTHON_GITHUB: &str = "https://github.com/indygreg/python-build-standalone/releases/download";
-const GHPROXY_PREFIX: &str = "https://gh-proxy.org/";
+const GHPROXY_PREFIX: &str = "https://gh-proxy.com/";
 const TUNA_PYPI: &str = "https://pypi.tuna.tsinghua.edu.cn/simple";
 const GET_PIP_URL: &str = "https://bootstrap.pypa.io/get-pip.py";
 const FFMPEG_URL: &str = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip";
@@ -154,6 +154,10 @@ fn is_cn_environment() -> bool {
 
 // ---------- 下载与解压 ----------
 
+/// 8 秒内收到的字节数低于此值视为"下载几乎无速度"，切换镜像重试
+const SPEED_CHECK_SECS: u64 = 8;
+const SPEED_CHECK_MIN_BYTES: u64 = 64 * 1024;
+
 fn download(url: &str, dest: &Path, progress_label: impl Fn(u64, u64)) -> Result<(), String> {
     if let Some(parent) = dest.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
@@ -170,6 +174,7 @@ fn download(url: &str, dest: &Path, progress_label: impl Fn(u64, u64)) -> Result
     let mut f = std::fs::File::create(dest).map_err(|e| e.to_string())?;
     let mut buf = [0u8; 65536];
     let mut got: u64 = 0;
+    let start = Instant::now();
     loop {
         let n = src.read(&mut buf).map_err(|e| e.to_string())?;
         if n == 0 {
@@ -178,8 +183,37 @@ fn download(url: &str, dest: &Path, progress_label: impl Fn(u64, u64)) -> Result
         f.write_all(&buf[..n]).map_err(|e| e.to_string())?;
         got += n as u64;
         progress_label(got, total);
+        // 速度检查：超时仍收不到最低字节数 → 判为无速度
+        if got < SPEED_CHECK_MIN_BYTES && start.elapsed() > Duration::from_secs(SPEED_CHECK_SECS) {
+            return Err(format!("下载速度过慢: {url}"));
+        }
     }
     Ok(())
+}
+
+/// 依次尝试多个 URL（直连 → 镜像），速度过慢自动切换。
+fn download_with_fallback(urls: &[String], dest: &Path,
+                          progress_label: impl Fn(u64, u64) + Copy) -> Result<(), String> {
+    let mut last_err = String::new();
+    for url in urls {
+        match download(url, dest, progress_label) {
+            Ok(()) => return Ok(()),
+            Err(e) => {
+                last_err = e;
+                let _ = std::fs::remove_file(dest);
+                set_progress(0.0, format!("切换镜像重试…"));
+            }
+        }
+    }
+    Err(last_err)
+}
+
+/// 构造 [直连, gh-proxy 镜像] 的候选 URL 列表。
+fn github_candidates(original: &str) -> [String; 2] {
+    [
+        original.to_string(),
+        format!("{GHPROXY_PREFIX}{original}"),
+    ]
 }
 
 fn extract_tar_gz(archive: &Path, dest: &Path) -> Result<(), String> {
@@ -248,12 +282,12 @@ fn ensure_python(cn: bool, app_dir: &Path, exe_dir: &Path) -> Result<PathBuf, St
     let mut downloaded = false;
     for (tag, asset) in PYTHON_CANDIDATES {
         let direct = format!("{PYTHON_GITHUB}/{tag}/{asset}");
-        let url = if cn {
-            format!("{GHPROXY_PREFIX}{direct}")
+        let urls = if cn {
+            github_candidates(&direct).into_iter().rev().collect::<Vec<_>>()
         } else {
-            direct
+            github_candidates(&direct).to_vec()
         };
-        match download(&url, &tmp, |got, total| {
+        match download_with_fallback(&urls, &tmp, |got, total| {
             let p = if total > 0 { got as f32 / total as f32 } else { 0.0 };
             set_progress(p * 0.6, format!("下载 Python ({got}/{total} 字节)"));
         }) {
@@ -363,12 +397,9 @@ fn ensure_ffmpeg(cn: bool, exe_dir: &Path) -> Result<Option<PathBuf>, String> {
     set_phase(Phase::DownloadingFfmpeg, "下载 ffmpeg");
     std::fs::create_dir_all(&bin).map_err(|e| e.to_string())?;
     let tmp = exe_dir.join("ffmpeg_tmp.zip");
-    let url = if cn {
-        format!("{GHPROXY_PREFIX}{FFMPEG_URL}")
-    } else {
-        FFMPEG_URL.to_string()
-    };
-    download(&url, &tmp, |got, total| {
+    let urls = github_candidates(FFMPEG_URL);
+    let urls = if cn { urls.into_iter().rev().collect::<Vec<_>>() } else { urls.to_vec() };
+    download_with_fallback(&urls, &tmp, |got, total| {
         let p = if total > 0 { got as f32 / total as f32 } else { 0.0 };
         set_progress(p * 0.8, format!("下载 ffmpeg ({got}/{total} 字节)"));
     })?;

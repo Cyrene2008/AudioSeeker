@@ -102,7 +102,7 @@ body {
   background: var(--accent-soft, rgba(255, 105, 160, 0.12));
 }
 .result-table input[type='checkbox'] {
-  accent-color: var(--accent, #ff69a0);
+  accent-color: var(--accent, #ea5ec1);
 }
 
 .mono {
