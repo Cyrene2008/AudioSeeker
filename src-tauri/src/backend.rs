@@ -160,10 +160,10 @@ fn is_cn_environment() -> bool {
 
 // ---------- 下载与解压 ----------
 
-/// 判定"下载几乎无速度"的阈值：15 秒内收到的字节数低于此值才切换镜像
-/// （给 gh-proxy 冷启动留足时间，避免误判）
-const SPEED_CHECK_SECS: u64 = 15;
-const SPEED_CHECK_MIN_BYTES: u64 = 64 * 1024;
+/// 判定"下载几乎无速度"的阈值：30 秒内收到的字节数低于此值才切换镜像
+/// （给 TUNA/gh-proxy 冷启动留足时间，避免误判）
+const SPEED_CHECK_SECS: u64 = 30;
+const SPEED_CHECK_MIN_BYTES: u64 = 32 * 1024;
 
 /// GitHub 加速镜像列表（依次尝试），原地址最后兜底
 const GH_PROXIES: &[&str] = &[
