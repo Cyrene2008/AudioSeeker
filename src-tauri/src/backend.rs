@@ -24,7 +24,7 @@ const PYTHON_CANDIDATES: &[(&str, &str)] = &[
     ("20240224", "cpython-3.10.13+20240224-x86_64-pc-windows-msvc-shared-install_only.tar.gz"),
 ];
 const PYTHON_GITHUB: &str = "https://github.com/indygreg/python-build-standalone/releases/download";
-const GHPROXY_PREFIX: &str = "https://gh-proxy.com/";
+
 const TUNA_PYPI: &str = "https://pypi.tuna.tsinghua.edu.cn/simple";
 const GET_PIP_URL: &str = "https://bootstrap.pypa.io/get-pip.py";
 const FFMPEG_URL: &str = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip";
@@ -154,16 +154,28 @@ fn is_cn_environment() -> bool {
 
 // ---------- 下载与解压 ----------
 
-/// 8 秒内收到的字节数低于此值视为"下载几乎无速度"，切换镜像重试
-const SPEED_CHECK_SECS: u64 = 8;
+/// 判定"下载几乎无速度"的阈值：15 秒内收到的字节数低于此值才切换镜像
+/// （给 gh-proxy 冷启动留足时间，避免误判）
+const SPEED_CHECK_SECS: u64 = 15;
 const SPEED_CHECK_MIN_BYTES: u64 = 64 * 1024;
+
+/// GitHub 加速镜像列表（依次尝试），原地址最后兜底
+const GH_PROXIES: &[&str] = &[
+    "https://gh-proxy.com/",
+    "https://gh-proxy.net/",
+    "https://ghfast.top/",
+    "https://mirror.ghproxy.com/",
+];
+
+/// 伪装浏览器 UA：gh-proxy 等镜像站会拦截非浏览器请求（Cloudflare 人机验证）
+const BROWSER_UA: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 
 fn download(url: &str, dest: &Path, progress_label: impl Fn(u64, u64)) -> Result<(), String> {
     if let Some(parent) = dest.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
     let resp = ureq::get(url)
-        .set("User-Agent", "CyreneAudioSeeker")
+        .set("User-Agent", BROWSER_UA)
         .timeout(Duration::from_secs(600))
         .call()
         .map_err(|e| format!("下载失败 {url}: {e}"))?;
@@ -191,29 +203,35 @@ fn download(url: &str, dest: &Path, progress_label: impl Fn(u64, u64)) -> Result
     Ok(())
 }
 
-/// 依次尝试多个 URL（直连 → 镜像），速度过慢自动切换。
+/// 依次尝试多个 URL（多镜像 → 原地址兜底），速度过慢自动切换。
 fn download_with_fallback(urls: &[String], dest: &Path,
                           progress_label: impl Fn(u64, u64) + Copy) -> Result<(), String> {
     let mut last_err = String::new();
-    for url in urls {
+    for (i, url) in urls.iter().enumerate() {
+        if i > 0 {
+            set_progress(0.0, format!("镜像失败，尝试下一个源: {url}"));
+        } else {
+            set_progress(0.0, format!("开始下载: {url}"));
+        }
         match download(url, dest, progress_label) {
             Ok(()) => return Ok(()),
             Err(e) => {
                 last_err = e;
                 let _ = std::fs::remove_file(dest);
-                set_progress(0.0, format!("切换镜像重试…"));
             }
         }
     }
     Err(last_err)
 }
 
-/// 构造 [gh-proxy 镜像, 原地址] 的候选 URL 列表：镜像优先，失败回退原地址。
-fn github_candidates(original: &str) -> [String; 2] {
-    [
-        format!("{GHPROXY_PREFIX}{original}"),
-        original.to_string(),
-    ]
+/// 构造 [多镜像, 原地址] 的候选 URL 列表。
+fn github_candidates(original: &str) -> Vec<String> {
+    let mut v: Vec<String> = GH_PROXIES
+        .iter()
+        .map(|p| format!("{p}{original}"))
+        .collect();
+    v.push(original.to_string());
+    v
 }
 
 fn extract_tar_gz(archive: &Path, dest: &Path) -> Result<(), String> {
@@ -282,7 +300,7 @@ fn ensure_python(_cn: bool, app_dir: &Path, exe_dir: &Path) -> Result<PathBuf, S
     let mut downloaded = false;
     for (tag, asset) in PYTHON_CANDIDATES {
         let direct = format!("{PYTHON_GITHUB}/{tag}/{asset}");
-        let urls = github_candidates(&direct).to_vec();
+        let urls = github_candidates(&direct);
         match download_with_fallback(&urls, &tmp, |got, total| {
             let p = if total > 0 { got as f32 / total as f32 } else { 0.0 };
             set_progress(p * 0.6, format!("下载 Python ({got}/{total} 字节)"));
@@ -374,7 +392,7 @@ fn install_deps(cn: bool, py: &Path, backend: &Path) -> Result<(), String> {
     Err(last_err)
 }
 
-fn ensure_ffmpeg(cn: bool, exe_dir: &Path) -> Result<Option<PathBuf>, String> {
+fn ensure_ffmpeg(_cn: bool, exe_dir: &Path) -> Result<Option<PathBuf>, String> {
     set_phase(Phase::CheckingFfmpeg, "检查 ffmpeg");
     let probe = Command::new("ffmpeg")
         .arg("-version")
@@ -401,7 +419,7 @@ fn ensure_ffmpeg(cn: bool, exe_dir: &Path) -> Result<Option<PathBuf>, String> {
     set_phase(Phase::DownloadingFfmpeg, "下载 ffmpeg");
     std::fs::create_dir_all(&bin).map_err(|e| e.to_string())?;
     let tmp = exe_dir.join("ffmpeg_tmp.zip");
-    let urls = github_candidates(FFMPEG_URL).to_vec();
+    let urls = github_candidates(FFMPEG_URL);
     download_with_fallback(&urls, &tmp, |got, total| {
         let p = if total > 0 { got as f32 / total as f32 } else { 0.0 };
         set_progress(p * 0.8, format!("下载 ffmpeg ({got}/{total} 字节)"));
