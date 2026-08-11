@@ -24,6 +24,11 @@ const PYTHON_CANDIDATES: &[(&str, &str)] = &[
     ("20240224", "cpython-3.10.13+20240224-x86_64-pc-windows-msvc-shared-install_only.tar.gz"),
 ];
 const PYTHON_GITHUB: &str = "https://github.com/indygreg/python-build-standalone/releases/download";
+/// 清华 TUNA 镜像的 python.org 官方 Windows 安装包（含 pip）
+const TUNA_PYTHON_CANDIDATES: &[(&str, &str)] = &[
+    ("3.12.7", "python-3.12.7-amd64.exe"),
+    ("3.11.9", "python-3.11.9-amd64.exe"),
+];
 
 const TUNA_PYPI: &str = "https://pypi.tuna.tsinghua.edu.cn/simple";
 const GET_PIP_URL: &str = "https://bootstrap.pypa.io/get-pip.py";
@@ -293,9 +298,49 @@ fn ensure_python(_cn: bool, app_dir: &Path, exe_dir: &Path) -> Result<PathBuf, S
     if exists {
         return Ok(py);
     }
-    set_phase(Phase::DownloadingPython, "下载 Python 运行时");
     let env_dir = py.parent().unwrap_or(exe_dir).to_path_buf();
     std::fs::create_dir_all(&env_dir).map_err(|e| e.to_string())?;
+
+    // 方案一（优先）：清华 TUNA 镜像的 python.org 官方安装包（国内直连，自带 pip）
+    set_phase(Phase::DownloadingPython, "下载 Python 运行时（清华镜像）");
+    let mut last_err = String::from("Python 安装失败");
+    for (ver, asset) in TUNA_PYTHON_CANDIDATES {
+        let url = format!("https://mirrors.tuna.tsinghua.edu.cn/python/{ver}/{asset}");
+        let tmp = env_dir.join(format!("python_setup_{ver}.exe"));
+        match download(&url, &tmp, |got, total| {
+            let p = if total > 0 { got as f32 / total as f32 } else { 0.0 };
+            set_progress(p * 0.6, format!("下载 Python ({got}/{total} 字节)"));
+        }) {
+            Ok(()) => {}
+            Err(e) => {
+                last_err = e;
+                let _ = std::fs::remove_file(&tmp);
+                continue;
+            }
+        }
+        set_phase(Phase::ExtractingPython, "静默安装 Python 运行时");
+        let mut cmd = Command::new(&tmp);
+        cmd.args([
+            "/quiet", "InstallAllUsers=0", "PrependPath=0",
+            "Include_launcher=0", "Include_test=0", "Include_doc=0",
+            "Include_tcltk=0", "Include_pip=1",
+            "TargetDir=", env_dir.to_str().unwrap_or(""),
+        ]);
+        hide_window(&mut cmd);
+        let _ = cmd.status();
+        let _ = std::fs::remove_file(&tmp);
+        // 安装器可能异步收尾，轮询 python.exe
+        for _ in 0..90 {
+            if py.is_file() {
+                return Ok(py);
+            }
+            std::thread::sleep(Duration::from_secs(1));
+        }
+        last_err = format!("静默安装超时（{ver}）");
+    }
+
+    // 方案二（回退）：python-build-standalone tar.gz（多镜像 → 原地址）
+    set_phase(Phase::DownloadingPython, "下载 Python 运行时（镜像回退）");
     let tmp = env_dir.join("python_runtime.tar.gz");
     let mut downloaded = false;
     for (tag, asset) in PYTHON_CANDIDATES {
@@ -310,13 +355,13 @@ fn ensure_python(_cn: bool, app_dir: &Path, exe_dir: &Path) -> Result<PathBuf, S
                 break;
             }
             Err(e) => {
+                last_err = e;
                 let _ = std::fs::remove_file(&tmp);
-                set_progress(0.0, e);
             }
         }
     }
     if !downloaded {
-        return Err("Python 下载失败（请检查网络，可尝试设置代理）".into());
+        return Err(format!("Python 下载失败: {last_err}（请检查网络）"));
     }
     set_phase(Phase::ExtractingPython, "解压 Python 运行时");
     extract_tar_gz(&tmp, &env_dir).map_err(|e| e.to_string())?;
