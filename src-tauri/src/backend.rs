@@ -546,6 +546,38 @@ fn ensure_ffmpeg(_cn: bool, exe_dir: &Path) -> Result<Option<PathBuf>, String> {
     Ok(Some(bin))
 }
 
+/// 通过 netstat 找到占用指定端口的 PID 并树杀（只杀占用该端口的残留后端进程）
+fn kill_process_on_port(port: u16) {
+    let out = match Command::new("netstat")
+        .args(["-ano", "-p", "tcp"])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .output()
+    {
+        Ok(o) => o,
+        Err(_) => return,
+    };
+    let text = String::from_utf8_lossy(&out.stdout);
+    let mut pids = std::collections::HashSet::new();
+    for line in text.lines() {
+        if line.contains(&format!(":{port}")) && line.contains("LISTENING") {
+            if let Some(pid) = line.split_whitespace().last() {
+                if let Ok(pid) = pid.parse::<u32>() {
+                    pids.insert(pid);
+                }
+            }
+        }
+    }
+    for pid in pids {
+        let mut cmd = Command::new("taskkill");
+        cmd.args(["/PID", &pid.to_string(), "/T", "/F"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        hide_window(&mut cmd);
+        let _ = cmd.status();
+    }
+}
+
 fn start_backend(py: &Path, backend: &Path, port: u16, app_dir: &Path,
                  data_dir: &Path, ffmpeg_bin: Option<&Path>) -> Result<Child, String> {
     set_phase(Phase::StartingBackend, "启动后端服务");
