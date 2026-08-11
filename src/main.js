@@ -80,8 +80,14 @@ const router = createRouter({
 const app = createApp(App)
 
 // Vue 渲染错误也接到全局错误面板（避免"白屏无提示"）
-app.config.errorHandler = (err, _instance, info) => {
-  showFatalError(`${err && err.message ? err.message : err}${info ? `\n(${info})` : ''}`)
+app.config.errorHandler = (err, instance, info) => {
+  let loc = ''
+  try {
+    const route = window.location.hash
+    const comp = instance && instance.type && (instance.type.__name || instance.type.name)
+    loc = `${route}${comp ? ` @${comp}` : ''}${info ? ` (${info})` : ''}`
+  } catch { /* ignore */ }
+  showFatalError(`${err && err.message ? err.message : err}\n${loc}`)
 }
 
 app.use(router).mount('#app')
