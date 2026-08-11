@@ -1,20 +1,15 @@
 <template>
-  <FluentTitleBar
-    class="titlebar"
-    draggable
-    :show-window-controls="false"
-    @minimize="minimize"
-    @maximize="maximize"
-    @close="close"
-  >
+  <FluentTitleBar class="titlebar" :draggable="false">
+    <div class="titlebar-drag" aria-hidden="true" />
     <div class="titlebar-inner">
+      <img :src="avatar" class="tb-avatar" alt="" draggable="false" />
       <button class="tb-btn hamburger" :class="{ active: hamburger }" title="菜单" @click.stop="$emit('toggle-hamburger')">
         <Icon icon="fluent:line-horizontal-3-20-regular" :width="18" />
       </button>
       <span class="tb-title">{{ t('appName') }}</span>
       <div class="tb-spacer" />
       <button class="tb-btn" title="GitHub" @click.stop="openGithub">
-        <Icon icon="fluent:mark-github-24-regular" :width="17" />
+        <Icon icon="mdi:github" :width="18" />
       </button>
       <div class="tb-sep" />
       <button class="tb-btn win" title="最小化" @click.stop="minimize">
@@ -33,6 +28,7 @@
 <script setup>
 import { FluentTitleBar } from 'vue-fluent-widgets'
 import { Icon } from '@iconify/vue'
+import avatar from '../../assets/avatars/Cyrene2008.png'
 import { t } from '../../utils/i18n'
 import { tauri } from '../../utils/api'
 
@@ -71,14 +67,31 @@ function openGithub() {
 <style scoped>
 .titlebar {
   flex-shrink: 0;
+  position: relative;
   border-bottom: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
 }
+/* 自定义拖拽条：铺满标题栏空白区域；按钮需在其上方并 no-drag */
+.titlebar-drag {
+  position: absolute;
+  inset: 0;
+  -webkit-app-region: drag;
+  z-index: 0;
+}
 .titlebar-inner {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   height: 40px;
   padding: 0 4px;
   gap: 2px;
+}
+.tb-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-left: 8px;
 }
 .tb-btn {
   display: flex;
@@ -91,6 +104,7 @@ function openGithub() {
   background: transparent;
   color: var(--text-secondary, #666);
   cursor: pointer;
+  -webkit-app-region: no-drag;
   transition: background 0.15s;
 }
 .tb-btn:hover { background: var(--bg-hover, rgba(0, 0, 0, 0.06)); }

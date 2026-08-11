@@ -4,7 +4,7 @@
 
     <div class="action-bar">
       <FluentButton appearance="accent" @click="importOpen = true">
-        <Icon icon="fluent:import-24-regular" :width="16" /> {{ t('importIndex') }}
+        <Icon icon="fluent:arrow-import-24-regular" :width="16" /> {{ t('importIndex') }}
       </FluentButton>
       <FluentButton @click="loadIndexes"><Icon icon="fluent:arrow-counterclockwise-24-regular" :width="16" /> {{ t('refresh') }}</FluentButton>
     </div>

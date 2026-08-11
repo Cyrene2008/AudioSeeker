@@ -3,9 +3,7 @@
     <template v-if="bootState.phase !== 'ready' && !skipped">
       <div class="boot-overlay">
         <div class="boot-card">
-          <div class="boot-logo">
-            <Icon icon="fluent:headphones-sound-wave-24-filled" :width="64" />
-          </div>
+          <img :src="bootAvatar" class="boot-logo" alt="" draggable="false" />
           <h2>{{ t('appName') }}</h2>
           <p class="boot-detail">{{ bootDetail }}</p>
           <div class="boot-bar">
@@ -48,7 +46,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { FluentButton, FluentInfoBar } from 'vue-fluent-widgets'
-import { Icon } from '@iconify/vue'
+import bootAvatar from './assets/avatars/Cyrene2008.png'
 import TitleBar from './components/layout/TitleBar.vue'
 import Dock from './components/layout/Dock.vue'
 import PlayerBar from './components/layout/PlayerBar.vue'
@@ -157,12 +155,9 @@ onUnmounted(() => {
   width: 88px;
   height: 88px;
   margin: 0 auto 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   border-radius: 50%;
-  background: linear-gradient(135deg, #ff6fb0, #ea5ec1);
-  color: #fff;
+  object-fit: cover;
+  box-shadow: 0 4px 16px rgba(234, 94, 193, 0.3);
 }
 .boot-card h2 {
   margin: 0 0 12px;

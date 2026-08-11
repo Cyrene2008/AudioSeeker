@@ -3,24 +3,19 @@
     <div class="about-card">
       <img :src="avatar" class="about-avatar" alt="Cyrene2008" />
       <h1>Cyreneの音频检索器</h1>
-      <div class="about-ver mono">v{{ version }}</div>
+      <div class="about-ver mono">v{{ version }}<span v-if="build" class="about-build"> · build {{ build }}</span></div>
       <p class="about-desc">{{ t('ackLibs') }}</p>
 
       <div class="about-actions">
-        <FluentButton @click="openRepo"><Icon icon="fluent:mark-github-24-regular" :width="16" /> {{ t('openRepo') }}</FluentButton>
-        <FluentButton @click="doCheck" :disabled="updateState.checking">
-          <Icon icon="fluent:arrow-circle-down-24-regular" :width="16" />
-          {{ updateState.checking ? t('checking') : t('checkUpdate') }}
-        </FluentButton>
+        <FluentButton @click="openRepo"><Icon icon="mdi:github" :width="16" /> {{ t('openRepo') }}</FluentButton>
       </div>
 
-      <div v-if="updateState.available" class="update-box">
-        <b>{{ t('updateFound') }}: v{{ updateState.version }}</b>
-        <FluentHyperlinkButton :href="updateState.url" target="_blank" :label="t('download')" />
+      <div class="about-powered">
+        <span class="powered-text">Powered by</span>
+        <FluentHyperlinkButton href="https://www.npmjs.com/package/vue-fluent-widgets" target="_blank" label="VueFluentWidgets" />
       </div>
 
       <div class="about-links">
-        <FluentHyperlinkButton href="https://github.com/Cyrene2008/CyreneAudioSeeker" target="_blank" label="GitHub" />
         <span class="about-copy">© {{ new Date().getFullYear() }} Cyrene2008</span>
       </div>
     </div>
@@ -33,10 +28,10 @@ import { Icon } from '@iconify/vue'
 import avatar from '../assets/avatars/Cyrene2008.png'
 import { t } from '../utils/i18n'
 import { tauri } from '../utils/api'
-import { checkUpdate, updateState, currentVersion } from '../utils/updater'
-import { pushToast } from '../components/ToastHost.vue'
+import { currentVersion } from '../utils/updater'
 
 const version = currentVersion()
+const build = __BUILD_COMMIT__
 const GITHUB = 'https://github.com/Cyrene2008/CyreneAudioSeeker'
 
 function openRepo() {
@@ -44,17 +39,6 @@ function openRepo() {
     import('@tauri-apps/plugin-opener').then(({ openUrl }) => openUrl(GITHUB))
   } else {
     window.open(GITHUB)
-  }
-}
-
-async function doCheck() {
-  const r = await checkUpdate()
-  if (r.available) {
-    pushToast({ title: `${t('updateFound')} v${r.version}`, body: r.url })
-  } else if (r.error) {
-    pushToast({ title: t('updateFail'), body: r.error })
-  } else {
-    pushToast({ title: t('upToDate'), body: `v${r.version}` })
   }
 }
 </script>
@@ -78,15 +62,27 @@ async function doCheck() {
 }
 .about-card h1 { margin: 12px 0 4px; font-size: 22px; }
 .about-ver { color: var(--text-secondary); font-size: 13px; }
+.about-build { color: var(--text-muted, #a16d88); }
 .about-desc { margin: 18px 0; font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
 .about-actions { display: flex; justify-content: center; gap: 10px; }
-.update-box { margin-top: 14px; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 13px; }
-.about-links {
-  margin-top: 22px;
+.about-powered {
+  margin-top: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-muted, #a16d88);
+}
+.powered-text {
+  font-family: 'MiSans', 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  font-size: 12px;
+}
+.about-links {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 12px;
 }
 .about-copy { color: var(--text-muted, #999); }

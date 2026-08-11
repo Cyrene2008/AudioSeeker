@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { addCollection } from '@iconify/vue'
 import fluentIcons from '@iconify-json/fluent/icons.json'
+import mdiIcons from '@iconify-json/mdi/icons.json'
 import 'vue-fluent-widgets/style.css'
 import './assets/css/main.css'
 import App from './App.vue'
@@ -32,8 +33,27 @@ function showFatalError(msg) {
   el.appendChild(div)
 }
 
-// 本地注册 Fluent 图标集：离线可用（不依赖 iconify 在线 API）
+// 本地注册 Fluent 图标集 + mdi（GitHub 品牌图标）：离线可用
 addCollection(fluentIcons)
+addCollection(mdiIcons)
+
+// 禁止 Ctrl+A / Meta+A 全选页面文字（输入框除外，与桌面应用行为一致）
+window.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) {
+    const t = e.target
+    const editable = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA'
+      || t.isContentEditable)
+    if (!editable) e.preventDefault()
+  }
+})
+
+// 禁止右键菜单（输入框除外）
+window.addEventListener('contextmenu', (e) => {
+  const t = e.target
+  const editable = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA'
+    || t.isContentEditable)
+  if (!editable) e.preventDefault()
+})
 function applyTheme() {
   const root = document.documentElement
   root.classList.add('peach')

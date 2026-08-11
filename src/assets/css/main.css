@@ -1,5 +1,31 @@
 /* 全局样式与字体 */
 
+/* 修复：库的 FluentTitleBar 拖拽区是 absolute inset:0，父级无定位会铺满全窗口
+   （导致全页可拖拽/双击最大化）。这里给标题栏加定位，把拖拽区限制在标题栏内。 */
+.fluent-title-bar {
+  position: relative;
+}
+
+/* FluentNavigationView 选中指示器（npm 构建版缺失，按仓库源码补齐）+
+   悬停反馈与鼠标指针 */
+.fluent-navigation-view .menu-item {
+  cursor: pointer;
+}
+.fluent-navigation-view .menu-item.is-selected {
+  background: var(--bg-hover, rgba(0, 0, 0, 0.05));
+  color: var(--text-primary);
+}
+.fluent-navigation-view .menu-item.is-selected::before {
+  position: absolute;
+  left: -4px;
+  top: 10px;
+  width: 3px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--accent, #ea5ec1);
+  content: '';
+}
+
 @font-face {
   font-family: 'MiSans';
   src: url('../fonts/MiSans-Regular.ttf') format('truetype');
@@ -25,12 +51,20 @@ body,
   height: 100%;
   margin: 0;
   overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 body {
   font-family: 'MiSans', 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif;
   background: var(--bg-base, #fdf5fa);
   color: var(--text-primary, #1f1f1f);
+}
+
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 .app-shell {
