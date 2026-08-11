@@ -21,12 +21,9 @@
     </template>
 
     <template v-else>
-      <TitleBar :hamburger="hamburgerOpen" @toggle-hamburger="hamburgerOpen = !hamburgerOpen" />
+      <TitleBar />
       <div class="app-body">
-        <Dock :hamburger-open="hamburgerOpen" />
-        <main class="app-content">
-          <router-view />
-        </main>
+        <Dock />
       </div>
       <PlayerBar />
       <FluentInfoBar
@@ -57,7 +54,6 @@ import { tauri, api } from './utils/api'
 import { loadSettingsFromBackend } from './stores/settings'
 
 const bootState = ref({ phase: 'starting', detail: '', progress: 0, error: '' })
-const hamburgerOpen = ref(false)
 const bootLong = ref(false)
 const skipped = ref(false)
 

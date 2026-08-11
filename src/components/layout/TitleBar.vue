@@ -3,9 +3,6 @@
     <div class="titlebar-drag" aria-hidden="true" />
     <div class="titlebar-inner">
       <img :src="avatar" class="tb-avatar" alt="" draggable="false" />
-      <button class="tb-btn hamburger" :class="{ active: hamburger }" title="菜单" @click.stop="$emit('toggle-hamburger')">
-        <Icon icon="fluent:line-horizontal-3-20-regular" :width="18" />
-      </button>
       <span class="tb-title">{{ t('appName') }}</span>
       <div class="tb-spacer" />
       <button class="tb-btn" title="GitHub" @click.stop="openGithub">
@@ -32,8 +29,8 @@ import avatar from '../../assets/avatars/Cyrene2008.png'
 import { t } from '../../utils/i18n'
 import { tauri } from '../../utils/api'
 
-defineProps({ hamburger: Boolean })
-defineEmits(['toggle-hamburger'])
+defineProps({})
+defineEmits([])
 
 const GITHUB = 'https://github.com/Cyrene2008/CyreneAudioSeeker'
 
@@ -108,7 +105,6 @@ function openGithub() {
   transition: background 0.15s;
 }
 .tb-btn:hover { background: var(--bg-hover, rgba(0, 0, 0, 0.06)); }
-.tb-btn.hamburger.active { background: var(--bg-hover, rgba(0, 0, 0, 0.08)); color: var(--accent); }
 .tb-title {
   font-size: 13px;
   font-weight: 600;
