@@ -121,16 +121,44 @@ def init_shard(path):
     con.close()
 
 
-def iter_library_files(root):
-    """递归收集 .wav 文件，返回绝对路径列表（排序保证稳定）"""
+def iter_library_files(root, recursive=True):
+    """收集 wav 文件，返回绝对路径列表（排序保证稳定）。
+
+    recursive=False 时只扫描根目录一层（不进入子目录）。
+    """
     root = os.path.abspath(root)
     out = []
-    for dirpath, _, fnames in os.walk(root):
+    for dirpath, dirs, fnames in os.walk(root):
+        if not recursive:
+            dirs.clear()
         for fn in sorted(fnames):
             if fn.lower().endswith('.wav'):
                 out.append(os.path.join(dirpath, fn))
     out.sort()
     return out
+
+
+def list_index_segments(index_dir):
+    """探测索引目录的分段结构。
+
+    返回 (段列表, 段名列表)：index_dir 本身含 shard_*.sqlite 则视为单段；
+    否则扫描其下的 seg_* 子目录。每段是一个完整的索引目录（含分片）。
+    """
+    if os.path.isdir(index_dir) and any(
+            f.startswith('shard_') and f.endswith('.sqlite')
+            for f in os.listdir(index_dir)):
+        return [index_dir], [os.path.basename(index_dir) or 'index']
+    segments = []
+    names = []
+    if os.path.isdir(index_dir):
+        for d in sorted(os.listdir(index_dir)):
+            p = os.path.join(index_dir, d)
+            if os.path.isdir(p) and any(
+                    f.startswith('shard_') and f.endswith('.sqlite')
+                    for f in os.listdir(p)):
+                segments.append(p)
+                names.append(d)
+    return segments, names
 
 
 class ShardIndex:
