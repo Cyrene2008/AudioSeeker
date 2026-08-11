@@ -5,12 +5,12 @@
     <div class="card">
       <div class="set-row">
         <div class="set-label">{{ t('darkMode') }}</div>
-        <FluentToggleSwitch v-model="settings.dark" @update:model-value="onChange" />
+        <FluentToggleSwitch :model-value="settings.dark" @update:model-value="(v) => updateSettings({ dark: v })" />
       </div>
 
       <div class="set-row">
         <div class="set-label">{{ t('language') }}</div>
-        <FluentSegmented v-model="settings.lang" :items="langItems" @update:model-value="onChange" />
+        <FluentSegmented :model-value="settings.lang" :items="langItems" @update:model-value="(v) => updateSettings({ lang: v })" />
       </div>
 
       <div class="set-row">
@@ -56,7 +56,7 @@ import { onMounted, ref } from 'vue'
 import { FluentButton, FluentHyperlinkButton, FluentSegmented, FluentToggleSwitch } from 'vue-fluent-widgets'
 import { Icon } from '@iconify/vue'
 import { t } from '../utils/i18n'
-import { settings, syncSettingsToBackend } from '../stores/settings'
+import { settings, updateSettings } from '../stores/settings'
 import { api, pickDir, tauri } from '../utils/api'
 import { checkUpdate, updateState, currentVersion } from '../utils/updater'
 import { pushToast } from '../components/ToastHost.vue'
@@ -68,10 +68,6 @@ const langItems = [
 ]
 const dataDir = ref('')
 const checked = ref(false)
-
-function onChange() {
-  syncSettingsToBackend(api)
-}
 
 async function changeIndexDir() {
   const d = await pickDir()

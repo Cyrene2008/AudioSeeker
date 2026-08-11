@@ -208,11 +208,11 @@ fn download_with_fallback(urls: &[String], dest: &Path,
     Err(last_err)
 }
 
-/// 构造 [直连, gh-proxy 镜像] 的候选 URL 列表。
+/// 构造 [gh-proxy 镜像, 原地址] 的候选 URL 列表：镜像优先，失败回退原地址。
 fn github_candidates(original: &str) -> [String; 2] {
     [
-        original.to_string(),
         format!("{GHPROXY_PREFIX}{original}"),
+        original.to_string(),
     ]
 }
 
@@ -270,7 +270,7 @@ fn locate_python(app_dir: &Path, exe_dir: &Path) -> (PathBuf, bool) {
     (env_dir.join("python.exe"), false)
 }
 
-fn ensure_python(cn: bool, app_dir: &Path, exe_dir: &Path) -> Result<PathBuf, String> {
+fn ensure_python(_cn: bool, app_dir: &Path, exe_dir: &Path) -> Result<PathBuf, String> {
     let (py, exists) = locate_python(app_dir, exe_dir);
     if exists {
         return Ok(py);
@@ -282,11 +282,7 @@ fn ensure_python(cn: bool, app_dir: &Path, exe_dir: &Path) -> Result<PathBuf, St
     let mut downloaded = false;
     for (tag, asset) in PYTHON_CANDIDATES {
         let direct = format!("{PYTHON_GITHUB}/{tag}/{asset}");
-        let urls = if cn {
-            github_candidates(&direct).into_iter().rev().collect::<Vec<_>>()
-        } else {
-            github_candidates(&direct).to_vec()
-        };
+        let urls = github_candidates(&direct).to_vec();
         match download_with_fallback(&urls, &tmp, |got, total| {
             let p = if total > 0 { got as f32 / total as f32 } else { 0.0 };
             set_progress(p * 0.6, format!("下载 Python ({got}/{total} 字节)"));
@@ -355,19 +351,27 @@ fn install_deps(cn: bool, py: &Path, backend: &Path) -> Result<(), String> {
     if !req.is_file() {
         return Err("requirements.txt 不存在".into());
     }
-    let mut cmd = Command::new(py);
-    cmd.args(["-m", "pip", "install", "-r", req.to_str().unwrap()])
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
-    if cn {
-        cmd.args(["-i", TUNA_PYPI]);
+    // 镜像优先：默认/CN 各取首选，失败回退另一源
+    let indexes: [&str; 2] = if cn {
+        [TUNA_PYPI, "https://pypi.org/simple"]
+    } else {
+        ["https://pypi.org/simple", TUNA_PYPI]
+    };
+    let mut last_err = String::from("依赖安装失败");
+    for idx in indexes {
+        let mut cmd = Command::new(py);
+        cmd.args(["-m", "pip", "install", "-r", req.to_str().unwrap(),
+                  "-i", idx, "--timeout", "30"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        hide_window(&mut cmd);
+        match cmd.status() {
+            Ok(s) if s.success() => return Ok(()),
+            Ok(_) => last_err = format!("pip 安装失败（{idx}）"),
+            Err(e) => last_err = format!("pip 执行失败: {e}"),
+        }
     }
-    hide_window(&mut cmd);
-    let status = cmd.status().map_err(|e| e.to_string())?;
-    if !status.success() {
-        return Err("Python 依赖安装失败".into());
-    }
-    Ok(())
+    Err(last_err)
 }
 
 fn ensure_ffmpeg(cn: bool, exe_dir: &Path) -> Result<Option<PathBuf>, String> {
@@ -397,8 +401,7 @@ fn ensure_ffmpeg(cn: bool, exe_dir: &Path) -> Result<Option<PathBuf>, String> {
     set_phase(Phase::DownloadingFfmpeg, "下载 ffmpeg");
     std::fs::create_dir_all(&bin).map_err(|e| e.to_string())?;
     let tmp = exe_dir.join("ffmpeg_tmp.zip");
-    let urls = github_candidates(FFMPEG_URL);
-    let urls = if cn { urls.into_iter().rev().collect::<Vec<_>>() } else { urls.to_vec() };
+    let urls = github_candidates(FFMPEG_URL).to_vec();
     download_with_fallback(&urls, &tmp, |got, total| {
         let p = if total > 0 { got as f32 / total as f32 } else { 0.0 };
         set_progress(p * 0.8, format!("下载 ffmpeg ({got}/{total} 字节)"));

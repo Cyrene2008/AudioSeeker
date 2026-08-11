@@ -3,7 +3,7 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 import 'vue-fluent-widgets/style.css'
 import './assets/css/main.css'
 import App from './App.vue'
-import { settings } from './stores/settings'
+import { settings, onSettingsChange } from './stores/settings'
 
 // 主题：peach（桃粉）+ 深色，跟随设置
 function applyTheme() {
@@ -13,7 +13,7 @@ function applyTheme() {
   root.classList.toggle('light', !settings.dark)
   root.lang = settings.lang === 'en' ? 'en' : 'zh-CN'
 }
-settings.onChange(applyTheme)
+onSettingsChange(applyTheme)
 applyTheme()
 
 const router = createRouter({

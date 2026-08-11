@@ -1,49 +1,44 @@
-// 设置 Store：与后端 /api/settings 同步，启动前用 localStorage 兜底
+// 设置 Store：持久化到本地文件（后端 {数据目录}/settings.json），不依赖 localStorage
 import { reactive } from 'vue'
-
-const saved = (() => {
-  try {
-    return JSON.parse(localStorage.getItem('cyrene-audio-settings') || '{}')
-  } catch {
-    return {}
-  }
-})()
+import { api } from '../utils/api'
 
 export const settings = reactive({
   default_index_dir: '',
-  lang: saved.lang || 'zh',
-  dark: saved.dark !== undefined ? saved.dark : true,
-  theme: saved.theme || 'peach',
-  _listeners: []
+  lang: 'zh',
+  dark: false, // 默认浅色
+  theme: 'peach'
 })
 
-settings.onChange = (fn) => settings._listeners.push(fn)
+const listeners = []
+export function onSettingsChange(fn) {
+  listeners.push(fn)
+}
 
-function emit() {
-  try {
-    localStorage.setItem('cyrene-audio-settings',
-      JSON.stringify({ lang: settings.lang, dark: settings.dark, theme: settings.theme }))
-  } catch { /* ignore */ }
-  settings._listeners.forEach((fn) => fn())
+let syncTimer = null
+
+function emitAndSync() {
+  listeners.forEach((fn) => fn())
+  clearTimeout(syncTimer)
+  syncTimer = setTimeout(() => {
+    api.put('/api/settings', {
+      lang: settings.lang,
+      dark: settings.dark,
+      theme: settings.theme,
+      default_index_dir: settings.default_index_dir || undefined
+    }).catch(() => { /* 后端未就绪时静默，就绪后由 loadSettingsFromBackend 兜底 */ })
+  }, 300)
+}
+
+export function updateSettings(patch) {
+  Object.assign(settings, patch)
+  emitAndSync()
 }
 
 export function loadSettingsFromBackend(data) {
-  if (data && data.default_index_dir) settings.default_index_dir = data.default_index_dir
-  if (data && data.lang) settings.lang = data.lang
-  if (data && typeof data.dark === 'boolean') settings.dark = data.dark
-  emit()
-}
-
-export function applySettings(patch) {
-  Object.assign(settings, patch)
-  emit()
-}
-
-export function syncSettingsToBackend(api) {
-  api.put('/api/settings', {
-    lang: settings.lang,
-    dark: settings.dark,
-    theme: settings.theme,
-    default_index_dir: settings.default_index_dir || undefined
-  }).catch(() => {})
+  if (!data) return
+  if (data.default_index_dir) settings.default_index_dir = data.default_index_dir
+  if (data.lang) settings.lang = data.lang
+  if (typeof data.dark === 'boolean') settings.dark = data.dark
+  if (data.theme) settings.theme = data.theme
+  listeners.forEach((fn) => fn())
 }
