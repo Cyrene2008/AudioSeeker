@@ -1,9 +1,5 @@
 <template>
   <nav class="dock">
-    <div class="dock-header">
-      <img :src="logo" class="dock-logo" alt="" draggable="false" />
-      <span class="dock-title">Cyrene</span>
-    </div>
     <div class="dock-items">
       <router-link
         v-for="item in mainItems"
@@ -44,7 +40,6 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { Icon } from '@iconify/vue'
-import logo from '../../assets/avatars/Cyrene2008.png'
 import { t } from '../../utils/i18n'
 
 const route = useRoute()
@@ -68,26 +63,6 @@ const mainItems = computed(() => [
   background: var(--bg-card, rgba(255, 245, 252, 0.75));
   font-family: var(--font-ui, system-ui, sans-serif);
   overflow: hidden;
-}
-.dock-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
-}
-.dock-logo {
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
-  object-fit: cover;
-  flex-shrink: 0;
-}
-.dock-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary, #1f1f1f);
-  white-space: nowrap;
 }
 .dock-items {
   display: flex;

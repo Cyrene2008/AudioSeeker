@@ -169,7 +169,7 @@ def resolve_index(name, segment=None):
 
 
 @app.get('/api/health')
-def health():
+async def health():
     return {'ok': True, 'version': APP_VERSION}
 
 

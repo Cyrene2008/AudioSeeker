@@ -33,8 +33,12 @@
       <template #default>首次启动需等待后端初始化（加载索引通常需要 10~30 秒），完成后此提示会自动消失。</template>
     </FluentInfoBar>
 
-    <div v-if="lastMeta" class="meta-line mono">
-      {{ t('hashCount') }}: {{ lastMeta.hash_count }} · {{ t('matched') }}: {{ occs.length }} {{ t('colAligned').toLowerCase() }}
+    <div v-if="lastMeta" class="result-toolbar">
+      <div class="meta-line mono">
+        {{ t('hashCount') }}: {{ lastMeta.hash_count }} · {{ t('matched') }}: {{ occs.length }} {{ t('colAligned').toLowerCase() }}
+        <template v-if="mergeResults"> · {{ t('mergedResults') }}: {{ displayRows.length }}</template>
+      </div>
+      <FluentToggleSwitch v-model="mergeResults" :label="t('mergeSameFiles')" @change="selected.clear()" />
     </div>
 
     <div class="table-wrap grow-area">
@@ -54,15 +58,18 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-if="!occs.length">
+          <tr v-if="!displayRows.length">
             <td colspan="10" style="text-align: center; color: var(--text-secondary); padding: 40px">
               {{ busy ? t('searching') : (searched ? t('emptyResult') : t('noResult')) }}
             </td>
           </tr>
-          <tr v-for="(o, i) in occs" :key="i" :class="{ selected: selected.has(i) }" @click="toggleRow(i)">
+          <tr v-for="(o, i) in displayRows" :key="o._key" :class="{ selected: selected.has(i) }" @click="toggleRow(i)">
             <td><input type="checkbox" :checked="selected.has(i)" @click.stop="toggleRow(i)" /></td>
             <td class="mono">{{ i + 1 }}</td>
-            <td>{{ o?.name }}</td>
+            <td>
+              {{ o?.name }}
+              <span v-if="mergeResults && o._matchCount > 1" class="merge-count">×{{ o._matchCount }}</span>
+            </td>
             <td class="mono">{{ fmt(o?.offset_file) }}</td>
             <td class="mono">{{ fmt(o?.tq0 * frameSec) }}–{{ fmt(o?.tq1 * frameSec) }}</td>
             <td class="mono">{{ o?.aligned }}</td>
@@ -70,9 +77,9 @@
             <td class="mono">{{ fmt(o?.file_duration) }}</td>
             <td>{{ (o?.index_name || selectedIndex) }}</td>
             <td @click.stop>
-              <FluentButton compact appearance="subtle" @click="playOcc(o)"><Icon icon="fluent:play-24-regular" :width="14" /></FluentButton>
-              <FluentButton compact appearance="subtle" @click="favoriteOcc(o)"><Icon icon="fluent:star-24-regular" :width="14" /></FluentButton>
-              <FluentButton compact appearance="subtle" @click="reveal(o)"><Icon icon="fluent:folder-open-16-regular" :width="14" /></FluentButton>
+              <FluentButton variant="subtle" size="sm" icon-only :title="t('play')" @click="playOcc(o)"><Icon icon="fluent:play-24-regular" :width="14" /></FluentButton>
+              <FluentButton variant="subtle" size="sm" icon-only :title="t('favorite')" @click="favoriteOcc(o)"><Icon :icon="isFavorited(o) ? 'fluent:star-24-filled' : 'fluent:star-24-regular'" :width="14" /></FluentButton>
+              <FluentButton variant="subtle" size="sm" icon-only :title="t('reveal')" @click="reveal(o)"><Icon icon="fluent:folder-open-16-regular" :width="14" /></FluentButton>
             </td>
           </tr>
         </tbody>
@@ -80,11 +87,11 @@
     </div>
 
     <div class="action-bar">
-      <FluentButton compact @click="selectAll"><Icon icon="fluent:checkmark-circle-24-regular" :width="15" /> {{ t('selectAll') }}</FluentButton>
-      <FluentButton compact @click="selected.clear()">{{ t('clearSel') }}</FluentButton>
-      <FluentButton compact :disabled="!selected.size" @click="favoriteSelected"><Icon icon="fluent:star-add-24-regular" :width="15" /> {{ t('favorite') }}</FluentButton>
-      <FluentButton compact :disabled="!selected.size" @click="exportSelected"><Icon icon="fluent:save-arrow-right-24-regular" :width="15" /> {{ t('exportSel') }}</FluentButton>
-      <FluentButton compact :disabled="!occs.length" @click="exportAll"><Icon icon="fluent:library-24-regular" :width="15" /> {{ t('exportResult') }}</FluentButton>
+      <FluentButton variant="subtle" size="sm" @click="selectAll"><Icon icon="fluent:checkmark-circle-24-regular" :width="15" /> {{ t('selectAll') }}</FluentButton>
+      <FluentButton variant="subtle" size="sm" @click="selected.clear()">{{ t('clearSel') }}</FluentButton>
+      <FluentButton variant="subtle" size="sm" :disabled="!selected.size" @click="favoriteSelected"><Icon icon="fluent:star-add-24-regular" :width="15" /> {{ t('favorite') }}</FluentButton>
+      <FluentButton variant="subtle" size="sm" :disabled="!selected.size" @click="exportSelected"><Icon icon="fluent:save-arrow-right-24-regular" :width="15" /> {{ t('exportSel') }}</FluentButton>
+      <FluentButton variant="subtle" size="sm" :disabled="!occs.length" @click="exportAll"><Icon icon="fluent:library-24-regular" :width="15" /> {{ t('exportResult') }}</FluentButton>
     </div>
     </template>
 
@@ -112,10 +119,10 @@
               <td class="mono">{{ h?.count }}</td>
               <td class="mono">{{ h?.time }}</td>
               <td>
-                <FluentButton compact appearance="subtle" @click="loadHistory(h)">
+                <FluentButton variant="subtle" size="sm" @click="loadHistory(h)">
                   <Icon icon="fluent:play-24-regular" :width="14" /> {{ t('loadHistory') }}
                 </FluentButton>
-                <FluentButton compact appearance="subtle" @click="deleteHistory(h)">
+                <FluentButton variant="subtle" size="sm" icon-only :title="t('deleteHistory')" @click="deleteHistory(h)">
                   <Icon icon="fluent:delete-24-regular" :width="14" />
                 </FluentButton>
               </td>
@@ -128,13 +135,14 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, toRefs } from 'vue'
+import { computed, onMounted, reactive, ref, toRefs } from 'vue'
 import {
-  FluentButton, FluentComboBox, FluentEmptyState, FluentInfoBar, FluentInput, FluentSegmented
+  FluentButton, FluentComboBox, FluentEmptyState, FluentInfoBar, FluentInput, FluentSegmented,
+  FluentToggleSwitch
 } from 'vue-fluent-widgets'
 import { Icon } from '@iconify/vue'
 import { t } from '../utils/i18n'
-import { api, audioUrl, pickFile, savePath, tauri, checkHealth } from '../utils/api'
+import { api, audioUrl, pickFile, savePath, tauri } from '../utils/api'
 import { playTrack } from '../stores/player'
 import { searchState } from '../stores/search'
 import { backendState, startBackendPoll } from '../stores/backend'
@@ -148,6 +156,7 @@ const modeItems = computed(() => [
   { label: t('history'), value: 'history' }
 ])
 const historyList = ref([])
+const favoriteKeys = reactive(new Set())
 
 function basename(p) {
   if (!p) return '-'
@@ -197,9 +206,39 @@ const indexItems = computed(() => {
   return items
 })
 const { indexes, selectedIndex, sample, fromS, toS, minAligned, minRatio,
-        occs, selected, lastMeta, searched } = toRefs(searchState)
+        mergeResults, occs, selected, lastMeta, searched } = toRefs(searchState)
 const busy = ref(false)
 const backendUp = backendState; startBackendPoll()
+
+const displayRows = computed(() => {
+  if (!mergeResults.value) {
+    return occs.value.map((o, i) => ({ ...o, _key: `result-${i}`, _members: [o], _matchCount: 1 }))
+  }
+
+  const groups = new Map()
+  occs.value.forEach((o, i) => {
+    const filename = String(o?.name || '').trim()
+    const key = filename ? `name-${filename}` : `unnamed-${i}`
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key).push({ occurrence: o, index: i })
+  })
+
+  return [...groups.entries()].map(([key, entries]) => {
+    const best = entries.reduce((current, candidate) => {
+      const ratioDiff = Number(candidate.occurrence?.ratio || 0) - Number(current.occurrence?.ratio || 0)
+      if (ratioDiff !== 0) return ratioDiff > 0 ? candidate : current
+      const alignedDiff = Number(candidate.occurrence?.aligned || 0) - Number(current.occurrence?.aligned || 0)
+      return alignedDiff > 0 ? candidate : current
+    })
+    return {
+      ...best.occurrence,
+      ratio: Math.max(...entries.map(({ occurrence }) => Number(occurrence?.ratio || 0))),
+      _key: key,
+      _members: entries.map(({ occurrence }) => occurrence),
+      _matchCount: entries.length
+    }
+  })
+})
 
 function fmt(s) {
   if (s === undefined || s === null || isNaN(s)) return '-'
@@ -238,13 +277,7 @@ async function doMatch() {
   }
   busy.value = true
   try {
-    const ok = await checkHealth()
-    backendUp.ready = ok
-    if (!ok) {
-      pushToast({ title: '后端服务未就绪', body: '请检查后端是否启动，或稍后重试' })
-      busy.value = false
-      return
-    }
+    // 不预检健康，直接发请求（后端可能在加载大索引，health 会被阻塞导致误判）
     const { name, segment } = splitIndex(selectedIndex.value)
     const body = {
       index_name: name,
@@ -256,6 +289,7 @@ async function doMatch() {
       min_ratio: minRatio.value === '' ? null : Number(minRatio.value) / 100
     }
     const r = await api.post('/api/match', body)
+    backendUp.ready = true
     lastMeta.value = r
     occs.value = (r.occurrences || []).map((o) => ({ ...o, index_name: name, segment }))
     selected.value.clear()
@@ -264,7 +298,7 @@ async function doMatch() {
     const msg = String(e.message)
     if (msg.includes('Failed to fetch') || msg.includes('拒绝') || msg.includes('refused')) {
       backendUp.ready = false
-      pushToast({ title: '后端服务未响应', body: '程序后端可能未启动或已崩溃，请重启程序。若持续出现此问题，检查是否有端口占用。' })
+      pushToast({ title: '后端服务未响应', body: '程序后端可能未启动或正在加载大型索引（需 30~60 秒），请稍后重试。若持续出现此问题，请重启程序。' })
     } else {
       pushToast({ title: '检索失败', body: msg })
     }
@@ -282,21 +316,45 @@ function playOcc(o) {
 }
 
 async function favoriteOcc(o) {
+  const key = favoriteKey(o)
+  if (favoriteKeys.has(key)) {
+    pushToast({ title: t('favAlready'), body: o.name })
+    return
+  }
   try {
-    await api.post('/api/favorites', {
-      name: o.name, path: o.path, index_name: (o?.index_name || selectedIndex).value,
+    const result = await api.post('/api/favorites', {
+      name: o.name, path: o.path, index_name: o?.index_name || splitIndex(selectedIndex.value).name,
       offset: o.offset_file, span: o.span, aligned: o.aligned, ratio: o.ratio
     })
+    if (!result?.ok || !result?.id) throw new Error('Backend did not confirm the favorite')
+    favoriteKeys.add(key)
     pushToast({ title: t('favAdded'), body: o.name })
   } catch (e) {
-    pushToast({ title: t('favAdded') + '?', body: e.message })
+    pushToast({ title: t('favFailed'), body: e.message })
   }
 }
 
 async function favoriteSelected() {
-  const list = [...selected.value].map((i) => occs.value[i]).filter(Boolean)
+  const list = [...selected.value].map((i) => displayRows.value[i]).filter(Boolean)
   for (const o of list) await favoriteOcc(o)
   selected.value.clear()
+}
+
+function favoriteKey(o) {
+  const offset = o?.offset_file ?? o?.offset ?? ''
+  return `${o?.path || ''}\u0000${offset}\u0000${o?.span ?? ''}`
+}
+
+function isFavorited(o) {
+  return favoriteKeys.has(favoriteKey(o))
+}
+
+async function loadFavoriteKeys() {
+  try {
+    const favorites = await api.get('/api/favorites')
+    favoriteKeys.clear()
+    favorites.forEach((favorite) => favoriteKeys.add(favoriteKey(favorite)))
+  } catch { /* 后端未就绪时静默 */ }
 }
 
 function reveal(o) {
@@ -305,21 +363,25 @@ function reveal(o) {
   }
 }
 
-const allSelected = computed(() => occs.value.length > 0 && selected.value.size === occs.value.length)
+const allSelected = computed(() => displayRows.value.length > 0 && selected.value.size === displayRows.value.length)
 function toggleAll() {
   if (allSelected.value) selected.value.clear()
-  else occs.value.forEach((_, i) => selected.value.add(i))
+  else displayRows.value.forEach((_, i) => selected.value.add(i))
 }
 function toggleRow(i) {
   if (selected.value.has(i)) selected.value.delete(i)
   else selected.value.add(i)
 }
 function selectAll() {
-  occs.value.forEach((_, i) => selected.value.add(i))
+  displayRows.value.forEach((_, i) => selected.value.add(i))
 }
 
 async function exportSelected() {
-  await doExport([...selected.value].map((i) => occs.value[i]).filter(Boolean))
+  const list = [...selected.value]
+    .map((i) => displayRows.value[i])
+    .filter(Boolean)
+    .flatMap((o) => o._members || [o])
+  await doExport(list)
 }
 
 async function exportAll() {
@@ -347,6 +409,7 @@ async function doExport(list) {
 
 onMounted(() => {
   loadHistoryList()
+  loadFavoriteKeys()
   startBackendPoll()
   // 后端就绪后加载索引（带延迟重试）
   const tryLoad = async (retries) => {
@@ -363,7 +426,15 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.meta-line { margin-bottom: 8px; font-size: 12px; color: var(--text-secondary); }
+.result-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+.meta-line { font-size: 12px; color: var(--text-secondary); }
+.merge-count { margin-left: 5px; color: var(--text-secondary); font-size: 11px; }
 .table-wrap {
   overflow: auto;
   display: flex;

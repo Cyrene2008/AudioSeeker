@@ -26,25 +26,27 @@
       <TitleBar />
       <div class="app-body">
         <Dock />
-        <div class="app-content">
-          <router-view v-slot="{ Component }">
-            <transition name="page-forward" mode="out-in">
-              <component :is="Component" />
-            </transition>
-          </router-view>
+        <div class="page-view">
+          <div class="app-content">
+            <router-view v-slot="{ Component }">
+              <transition name="page-forward" mode="out-in">
+                <component :is="Component" />
+              </transition>
+            </router-view>
+          </div>
+          <PlayerBar />
+          <FluentInfoBar
+            v-if="bootState.phase !== 'ready'"
+            severity="warning"
+            :title="bootDetail"
+            :closable="false"
+            style="margin: 0 16px"
+          />
         </div>
       </div>
-      <PlayerBar />
-      <FluentInfoBar
-        v-if="bootState.phase !== 'ready'"
-        severity="warning"
-        :title="bootDetail"
-        :closable="false"
-        style="margin: 0 16px"
-      />
     </template>
 
-    <VersionBadge />
+    <VersionBadge v-if="!player.active" />
     <ToastHost />
   </div>
 </template>
@@ -61,6 +63,7 @@ import VersionBadge from './components/VersionBadge.vue'
 import { t } from './utils/i18n'
 import { tauri, api } from './utils/api'
 import { loadSettingsFromBackend } from './stores/settings'
+import { player } from './stores/player'
 
 const bootState = ref({ phase: 'starting', detail: '', progress: 0, error: '' })
 const bootLong = ref(false)

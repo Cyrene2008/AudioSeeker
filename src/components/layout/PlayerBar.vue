@@ -9,14 +9,14 @@
     </div>
     <FluentMediaPlayer
       ref="mpRef"
+      class="pb-player"
       :src="player.src"
       type="audio"
       :autoplay="true"
       :loop="false"
+      :poster="cover"
       :title="player.title"
       :artist="player.subtitle"
-      :height="'96px'"
-      :max-height="'96px'"
       :show-picture-in-picture="false"
     />
   </div>
@@ -26,6 +26,7 @@
 import { ref } from 'vue'
 import { FluentMediaPlayer } from 'vue-fluent-widgets'
 import { Icon } from '@iconify/vue'
+import cover from '../../assets/avatars/Cyrene2008.png'
 import { player, stopTrack } from '../../stores/player'
 
 const mpRef = ref(null)
@@ -34,14 +35,13 @@ const mpRef = ref(null)
 <style scoped>
 .player-bar {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 16px;
   flex-shrink: 0;
-  min-height: 72px;
-  padding: 6px 16px;
+  padding: 10px 16px;
   border-top: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
   background: var(--bg-acrylic, #fff);
-  overflow: hidden;
+  overflow: visible;
 }
 .pb-info {
   display: flex;
@@ -77,5 +77,9 @@ const mpRef = ref(null)
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.pb-player {
+  flex: 1;
+  min-width: 0;
 }
 </style>

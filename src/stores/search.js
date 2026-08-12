@@ -9,6 +9,7 @@ export const searchState = reactive({
   toS: '',
   minAligned: 8,
   minRatio: '',
+  mergeResults: false,
   occs: [],
   selected: new Set(),
   lastMeta: null,

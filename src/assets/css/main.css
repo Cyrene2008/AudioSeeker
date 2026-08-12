@@ -61,6 +61,15 @@ textarea {
   overflow: hidden;
 }
 
+.page-view {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .app-content {
   flex: 1;
   min-width: 0;

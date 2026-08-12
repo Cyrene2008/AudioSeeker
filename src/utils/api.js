@@ -26,7 +26,8 @@ async function ensurePort() {
 export async function checkHealth() {
   await ensurePort()
   try {
-    const resp = await fetch(`${apiBase()}/api/health`, { signal: AbortSignal.timeout(3000) })
+    // 10 秒超时：后端可能正在加载大索引（health 被同步端点阻塞）
+    const resp = await fetch(`${apiBase()}/api/health`, { signal: AbortSignal.timeout(10000) })
     if (!resp.ok) return false
     const d = await resp.json()
     return d && d.ok === true

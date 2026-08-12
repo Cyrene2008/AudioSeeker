@@ -1,6 +1,11 @@
 <template>
-  <FluentTitleBar class="titlebar" :draggable="false">
-    <div class="titlebar-drag" aria-hidden="true" />
+  <FluentTitleBar
+    class="titlebar"
+    show-window-controls
+    @minimize="minimize"
+    @maximize="maximize"
+    @close="close"
+  >
     <div class="titlebar-inner">
       <img :src="avatar" class="tb-avatar" alt="" draggable="false" />
       <span class="tb-title">{{ t('appName') }}</span>
@@ -9,15 +14,6 @@
         <Icon icon="mdi:github" :width="18" />
       </button>
       <div class="tb-sep" />
-      <button class="tb-btn win" title="最小化" @click.stop="minimize">
-        <Icon icon="fluent:subtract-24-regular" :width="16" />
-      </button>
-      <button class="tb-btn win" title="最大化" @click.stop="maximize">
-        <Icon icon="fluent:square-24-regular" :width="12" />
-      </button>
-      <button class="tb-btn win close" title="关闭" @click.stop="close">
-        <Icon icon="fluent:dismiss-24-regular" :width="16" />
-      </button>
     </div>
   </FluentTitleBar>
 </template>
@@ -64,31 +60,34 @@ function openGithub() {
 <style scoped>
 .titlebar {
   flex-shrink: 0;
-  position: relative;
-  border-bottom: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
-}
-/* 自定义拖拽条：铺满标题栏空白区域；按钮需在其上方并 no-drag */
-.titlebar-drag {
-  position: absolute;
-  inset: 0;
-  -webkit-app-region: drag;
-  z-index: 0;
+  width: 100%;
 }
 .titlebar-inner {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 32px;
+  gap: 2px;
+}
+.titlebar :deep(.title-bar-content) {
   position: relative;
   z-index: 1;
   display: flex;
+  min-width: 0;
+  height: 32px;
   align-items: center;
-  height: 40px;
-  padding: 0 4px;
-  gap: 2px;
+  padding: 0 8px;
+}
+.titlebar :deep(.title-bar-controls) {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
 }
 .tb-avatar {
   width: 22px;
   height: 22px;
   border-radius: 50%;
   object-fit: cover;
-  margin-left: 8px;
 }
 .tb-btn {
   display: flex;
@@ -114,6 +113,4 @@ function openGithub() {
 }
 .tb-spacer { flex: 1; }
 .tb-sep { width: 1px; height: 18px; margin: 0 6px; background: var(--border-subtle, #e0e0e0); }
-.tb-btn.win { border-radius: 0; height: 32px; width: 42px; }
-.tb-btn.win.close:hover { background: #e81123; color: #fff; }
 </style>
