@@ -11,6 +11,12 @@
   },
   "author": "Cyrene2008",
   "license": "CC BY-NC-SA 4.0",
+  "packageManager": "pnpm@10.29.3",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  },
   "devDependencies": {
     "@vuepress/bundler-vite": "2.0.0-rc.26",
     "http-server": "^14.1.1",
