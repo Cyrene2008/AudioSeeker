@@ -17,7 +17,7 @@ Cyreneの音频检索器的项目源代码依据 GNU General Public License v3.0
 
 - 用途：界面字体
 - 许可证：MiSans 字体许可
-- 许可信息：<https://hyperos.mi.com/font/download>
+- 许可信息：<https://hyperos.mi.com/font/faq>
 
 ### FFmpeg
 
@@ -49,7 +49,7 @@ The source code of Cyrene's Audio Seeker is released under the GNU General Publi
 
 - Purpose: user-interface font
 - License: MiSans font license
-- License information: <https://hyperos.mi.com/font/download>
+- License information: <https://hyperos.mi.com/font/faq>
 
 ### FFmpeg
 
