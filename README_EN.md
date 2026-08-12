@@ -16,7 +16,7 @@ Cyrene's Audio Seeker is a Windows desktop search tool for large audio libraries
 
 ## Features
 
-- Build local fingerprint indexes for large WAV libraries.
+- Build local fingerprint indexes for large audio libraries (WAV, FLAC, MP3, OGG, OPUS, AAC, M4A, WMA, AIFF, and more).
 - Locate source files and offsets from short or long samples.
 - Restrict the sample range and tune hit/confidence thresholds.
 - Merge results with identical filenames using the highest confidence.
@@ -109,8 +109,8 @@ Changing the default index location does not move existing or imported indexes.
 
 ## Audio Support
 
-- Index building currently scans WAV files.
-- Samples may be WAV, MP3, FLAC, OGG, M4A, or WMA.
+- Index building supports WAV, FLAC, MP3, OGG, OGA, OPUS, AAC, M4A, MP4, WMA, AIFF, and other common audio formats.
+- Samples support the same format list as index building.
 - Playback and conversion use FFmpeg.
 
 ## Architecture

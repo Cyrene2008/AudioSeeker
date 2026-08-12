@@ -14,6 +14,7 @@ import hashlib
 import json
 import multiprocessing as mp
 import os
+import subprocess
 import sys
 import time
 
@@ -33,12 +34,29 @@ def estimate_hashes(files):
     """用文件头快速估计每个文件的总哈希量（不完整解码）。"""
     out = []
     for f in files:
-        try:
-            dur = sf.info(f).duration
-        except Exception:
-            dur = 4.0
+        dur = probe_duration(f)
         out.append(int(dur * HASHES_PER_SEC_EST))
     return out
+
+
+def probe_duration(path):
+    """获取音频时长：soundfile 优先，失败用 ffprobe 兜底，再失败回退默认值。"""
+    try:
+        import soundfile as sf
+        return sf.info(path).duration
+    except Exception:
+        pass
+    try:
+        r = subprocess.run(
+            ['ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+             '-of', 'default=nw=1:nk=1', path],
+            capture_output=True, timeout=30)
+        dur = float(r.stdout.decode('utf-8', 'ignore').strip())
+        if dur > 0:
+            return dur
+    except Exception:
+        pass
+    return 4.0
 
 
 def split_segments(files, segment_size_mb):

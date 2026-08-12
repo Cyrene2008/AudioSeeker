@@ -1,0 +1,21 @@
+{
+  "name": "CyreneAudioSeeker-Docs",
+  "version": "1.0.0",
+  "description": "Documentation for Cyrene's Audio Seeker - Audio Fingerprint Search Desktop App",
+  "type": "module",
+  "scripts": {
+    "docs:dev": "vuepress dev .",
+    "docs:dev-clean": "vuepress dev . --clean-cache --clean-temp",
+    "docs:build": "vuepress build . --clean-cache --clean-temp",
+    "docs:preview": "http-server .vuepress/dist"
+  },
+  "author": "Cyrene2008",
+  "license": "CC BY-NC-SA 4.0",
+  "devDependencies": {
+    "@vuepress/bundler-vite": "2.0.0-rc.26",
+    "http-server": "^14.1.1",
+    "typescript": "^5.9.3",
+    "vuepress": "2.0.0-rc.26",
+    "vuepress-theme-plume": "1.0.0-rc.190"
+  }
+}

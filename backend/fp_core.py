@@ -7,11 +7,21 @@
 
 import os
 import sqlite3
+import subprocess
+import tempfile
 from collections import defaultdict
 
 import numpy as np
 import librosa
 from scipy.ndimage import maximum_filter
+
+# ---------- 支持的音频格式 ----------
+# 构建索引与样本检索支持以下常见音频容器/编码（解码优先 librosa/soundfile，
+# 其余交给内置 ffmpeg 兜底）
+SUPPORTED_AUDIO_EXTS = (
+    '.wav', '.flac', '.mp3', '.ogg', '.oga', '.opus',
+    '.aac', '.m4a', '.mp4', '.wma', '.aiff', '.aif',
+)
 
 # ---------- 指纹参数 ----------
 SR = 11025                # 指纹采样率 (mono)
@@ -36,11 +46,43 @@ HASHES_PER_SEC = 900.0    # 经验平均哈希速率, 用于估计样本时长
 
 # ---------- 指纹提取 ----------
 
+# soundfile/libsndfile 可直接解码的格式；其余（aac/m4a/mp4/wma）走 ffmpeg
+_SOUNDFILE_EXTS = ('.wav', '.flac', '.mp3', '.ogg', '.oga', '.opus', '.aiff', '.aif')
+
+
 def load_audio(path):
-    y, _ = librosa.load(path, sr=SR, mono=True, res_type='soxr_hq')
+    """解码音频为单声道 SR 采样率。优先 librosa/soundfile，其余格式用 ffmpeg 兜底。"""
+    ext = os.path.splitext(path)[1].lower()
+    if ext in _SOUNDFILE_EXTS:
+        try:
+            y, _ = librosa.load(path, sr=SR, mono=True, res_type='soxr_hq')
+        except Exception:
+            y = _ffmpeg_load(path)
+    else:
+        y = _ffmpeg_load(path)
     if y.size == 0:
         raise ValueError('empty audio')
     return y
+
+
+def _ffmpeg_load(path):
+    """用 ffmpeg 把任意格式解码为临时 WAV 再读取（m4a/aac/wma 等兜底）。"""
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix='.wav', dir=tempfile.gettempdir())
+    os.close(tmp_fd)
+    try:
+        cmd = ['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y',
+               '-i', path, '-ac', '1', '-ar', str(SR), tmp_path]
+        r = subprocess.run(cmd, capture_output=True)
+        if r.returncode != 0 or not os.path.exists(tmp_path):
+            detail = r.stderr.decode('utf-8', 'ignore')[-200:]
+            raise ValueError(f'ffmpeg 解码失败: {detail}')
+        y, _ = librosa.load(tmp_path, sr=SR, mono=True, res_type='soxr_hq')
+        return y
+    finally:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
 
 
 def spectrogram_db(y):
@@ -122,8 +164,9 @@ def init_shard(path):
 
 
 def iter_library_files(root, recursive=True):
-    """收集 wav 文件，返回绝对路径列表（排序保证稳定）。
+    """收集常见格式的音频文件，返回绝对路径列表（排序保证稳定）。
 
+    支持的格式见 SUPPORTED_AUDIO_EXTS。
     recursive=False 时只扫描根目录一层（不进入子目录）。
     """
     root = os.path.abspath(root)
@@ -132,7 +175,7 @@ def iter_library_files(root, recursive=True):
         if not recursive:
             dirs.clear()
         for fn in sorted(fnames):
-            if fn.lower().endswith('.wav'):
+            if fn.lower().endswith(SUPPORTED_AUDIO_EXTS):
                 out.append(os.path.join(dirpath, fn))
     out.sort()
     return out

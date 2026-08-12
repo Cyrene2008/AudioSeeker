@@ -14,7 +14,7 @@
         :label="t('selectIndex')"
         :placeholder="t('indexPlaceholder')"
       />
-      <FluentInput class="grow" :model-value="sample" :label="t('sample')" placeholder="*.wav / *.mp3 / *.flac…" readonly />
+      <FluentInput class="grow" :model-value="sample" :label="t('sample')" placeholder="*.wav / *.mp3 / *.flac / *.m4a…" readonly />
       <FluentButton variant="secondary" icon-only :title="t('browse')" @click="pickSample"><Icon icon="fluent:folder-open-24-regular" :width="16" /></FluentButton>
     </div>
 
@@ -266,7 +266,7 @@ async function loadIndexes() {
 }
 
 async function pickSample() {
-  const f = await pickFile([{ name: '音频', extensions: ['wav', 'mp3', 'flac', 'ogg', 'm4a', 'wma'] }])
+  const f = await pickFile([{ name: '音频', extensions: ['wav', 'mp3', 'flac', 'ogg', 'oga', 'opus', 'aac', 'm4a', 'mp4', 'wma', 'aiff', 'aif'] }])
   if (f) sample.value = f
 }
 
