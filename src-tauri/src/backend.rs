@@ -152,7 +152,7 @@ fn is_cn_environment() -> bool {
     }
     // GitHub API 超时视为大陆网络环境
     ureq::get("https://api.github.com/rate_limit")
-        .set("User-Agent", "CyreneAudioSeeker")
+        .set("User-Agent", "AudioSeeker")
         .timeout(Duration::from_secs(6))
         .call()
         .is_err()

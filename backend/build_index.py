@@ -2,9 +2,10 @@
 
 用法:
   python build_index.py <音频目录> --out <索引目录> [--workers N] [--limit N]
-                       [--recursive] [--ram-gb N] [--job <progress文件>]
+                        [--recursive] [--segment-size-mb N] [--incremental]
+                        [--job <progress文件>]
 
---ram-gb N: 按目标内存对音频分段建库（每段一个 seg_XXX 子目录，约 N GB 内存占用）。
+--segment-size-mb N: 按目标加载内存对音频分段建库（每段约 N MB，0 为单段）。
 --job: 服务模式，进度以 JSON 行写入指定文件（供前端进度条轮询）。
 """
 
@@ -40,15 +41,15 @@ def estimate_hashes(files):
     return out
 
 
-def split_segments(files, target_ram_gb):
+def split_segments(files, segment_size_mb):
     """按目标内存把文件列表分成若干段。
 
-    每段预计占用 target_ram_gb GB 内存。返回 [seg_files, ...]。
-    target_ram_gb<=0 时返回单段（全量）。
+    每段预计占用 segment_size_mb MB 内存。返回 [seg_files, ...]。
+    segment_size_mb<=0 时返回单段（全量）。
     """
-    if target_ram_gb <= 0 or len(files) <= 1:
+    if segment_size_mb <= 0 or len(files) <= 1:
         return [files]
-    budget = int(target_ram_gb * (1 << 30) / BYTES_PER_HASH)
+    budget = int(segment_size_mb * (1 << 20) / BYTES_PER_HASH)
     est = estimate_hashes(files)
     segments, cur, cur_est = [], [], 0
     for f, e in zip(files, est):
@@ -186,8 +187,37 @@ def _event_drainer(events, progress_cb, total, stop):
     progress_cb(last[0], done + failed + skipped, total, done, failed, skipped)
 
 
-def run_build(src_dir, out_dir, workers=0, recursive=False, target_ram_gb=0,
-              progress_cb=None, log=print):
+def indexed_paths(out_dir):
+    paths = set()
+    for dirpath, _, fnames in os.walk(out_dir):
+        for fn in fnames:
+            if not fn.startswith('shard_') or not fn.endswith('.sqlite'):
+                continue
+            con = sqlite3_connect(os.path.join(dirpath, fn))
+            paths.update(os.path.abspath(row[0]) for row in con.execute(
+                'SELECT path FROM files WHERE status=1'))
+            con.close()
+    return paths
+
+
+def next_segment_number(out_dir):
+    numbers = []
+    if os.path.isdir(out_dir):
+        for name in os.listdir(out_dir):
+            if name.startswith('seg_') and name[4:].isdigit():
+                numbers.append(int(name[4:]))
+    return max(numbers, default=-1) + 1
+
+
+def write_metadata(out_dir, segment_size_mb):
+    path = os.path.join(out_dir, 'index_meta.json')
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump({'schema': 1, 'segment_size_mb': int(segment_size_mb)}, f,
+                  ensure_ascii=False, indent=2)
+
+
+def run_build(src_dir, out_dir, workers=0, recursive=False, segment_size_mb=0,
+              incremental=False, progress_cb=None, log=print):
     """构建索引主入口（CLI 与服务模式共用）。
 
     progress_cb(name, processed, total, done, failed, skipped)
@@ -195,6 +225,9 @@ def run_build(src_dir, out_dir, workers=0, recursive=False, target_ram_gb=0,
     """
     t0 = time.time()
     files = iter_library_files(src_dir, recursive=recursive)
+    if incremental:
+        existing = indexed_paths(out_dir)
+        files = [f for f in files if os.path.abspath(f) not in existing]
     if not files:
         log('未找到 wav 文件')
         return 0, 0, 0, 0
@@ -210,11 +243,23 @@ def run_build(src_dir, out_dir, workers=0, recursive=False, target_ram_gb=0,
         drainer.start()
 
     ok = fail = skip = 0
-    segments = split_segments(files, target_ram_gb)
+    root_has_shards = os.path.isdir(out_dir) and any(
+        name.startswith('shard_') and name.endswith('.sqlite')
+        for name in os.listdir(out_dir))
+    if incremental and root_has_shards:
+        segments = [files]
+        if segment_size_mb > 0:
+            log('现有索引为单段结构，本次增量构建继续写入单段以保持兼容')
+    else:
+        segments = split_segments(files, segment_size_mb)
     log(f'共 {total} 个文件, 分为 {len(segments)} 段, 线程 {workers or "auto"}')
+    segment_start = next_segment_number(out_dir) if incremental else 0
     for i, seg_files in enumerate(segments):
-        if len(segments) > 1:
-            seg_dir = os.path.join(out_dir, f'seg_{i:03d}')
+        use_segment_dirs = not root_has_shards and (segment_size_mb > 0 or any(
+            name.startswith('seg_') for name in os.listdir(out_dir))
+        )
+        if use_segment_dirs:
+            seg_dir = os.path.join(out_dir, f'seg_{segment_start + i:03d}')
             log(f'== 段 {i+1}/{len(segments)}: {len(seg_files)} 个文件')
         else:
             seg_dir = out_dir
@@ -236,6 +281,8 @@ def run_build(src_dir, out_dir, workers=0, recursive=False, target_ram_gb=0,
                 con.close()
     log(f'完成: {ok} 新增, {fail} 失败, {skip} 已存在, '
         f'共 {total_hashes:,} 条哈希, 耗时 {time.time()-t0:.1f}s')
+    if not incremental:
+        write_metadata(out_dir, segment_size_mb)
     return ok, fail, skip, total_hashes
 
 
@@ -252,7 +299,9 @@ def main():
     ap.add_argument('--workers', type=int, default=0, help='并行进程数（默认 auto）')
     ap.add_argument('--limit', type=int, default=0, help='只处理前 N 个文件（调试用）')
     ap.add_argument('--recursive', action='store_true', help='递归扫描子目录')
-    ap.add_argument('--ram-gb', type=float, default=0, help='目标段内存(GB)，>0 时按内存分段')
+    ap.add_argument('--segment-size-mb', type=int, default=0,
+                    help='目标段加载内存(MB)，0 为单段')
+    ap.add_argument('--incremental', action='store_true', help='仅处理尚未入索引的文件')
     ap.add_argument('--job', default=None, help='服务模式：进度写入此 JSONL 文件')
     args = ap.parse_args()
 
@@ -277,10 +326,14 @@ def main():
         return
     if args.job:
         files = iter_library_files(args.audio_dir, recursive=args.recursive)
+        if args.incremental:
+            existing = indexed_paths(args.out)
+            files = [f for f in files if os.path.abspath(f) not in existing]
         with open(args.job, 'w', encoding='utf-8') as f:
             f.write(json.dumps(dict(started=True, total=len(files))) + '\n')
     run_build(args.audio_dir, args.out, workers=args.workers,
-              recursive=args.recursive, target_ram_gb=args.ram_gb,
+              recursive=args.recursive, segment_size_mb=args.segment_size_mb,
+              incremental=args.incremental,
               progress_cb=progress_cb)
 
 

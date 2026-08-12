@@ -1,4 +1,4 @@
-"""server.py - CyreneAudioSeeker 后端服务 (FastAPI)。
+"""server.py - AudioSeeker 后端服务 (FastAPI)。
 
 由 Tauri 前端启动（Rust 侧负责 Python 运行时引导），监听 127.0.0.1:CYRENE_PORT(默认8765)。
 提供：索引管理 / 构建任务 / 匹配 / 音频流(带Range) / 拼接导出 / 收藏 / 设置。
@@ -39,7 +39,7 @@ HISTORY_MAX = 50  # 最多保留的检索历史条数
 TMP_DIR = os.path.join(DATA_DIR, 'tmp')
 os.makedirs(TMP_DIR, exist_ok=True)
 
-app = FastAPI(title='CyreneAudioSeeker Backend', version=APP_VERSION)
+app = FastAPI(title='AudioSeeker Backend', version=APP_VERSION)
 app.add_middleware(
     CORSMiddleware, allow_origins=['*'], allow_methods=['*'], allow_headers=['*'])
 
@@ -71,6 +71,7 @@ def get_settings():
     s.setdefault('lang', 'zh')
     s.setdefault('dark', False)
     s.setdefault('theme', 'peach')
+    s.setdefault('unload_index_after_search', False)
     return s
 
 
@@ -129,26 +130,67 @@ def index_stats(index_path):
     return info
 
 
+def invalidate_index_stats(base):
+    prefix = os.path.abspath(base)
+    cache = getattr(index_stats, '_cache', {})
+    for path in list(cache):
+        absolute = os.path.abspath(path)
+        if absolute == prefix or absolute.startswith(prefix + os.sep):
+            cache.pop(path, None)
+
+
 # ---------- 索引加载缓存 ----------
 
 _index_cache = {}
 _index_cache_order = []
+_index_cache_lock = threading.RLock()
 INDEX_CACHE_MAX = 4
 
 
 def load_segment(seg_dir):
     """加载并缓存段索引（LRU，最多 4 段）。"""
-    if seg_dir in _index_cache:
-        _index_cache_order.remove(seg_dir)
+    with _index_cache_lock:
+        if seg_dir in _index_cache:
+            if seg_dir in _index_cache_order:
+                _index_cache_order.remove(seg_dir)
+            _index_cache_order.append(seg_dir)
+            return _index_cache[seg_dir]
+        indexes = load_indexes(seg_dir)
+        _index_cache[seg_dir] = indexes
         _index_cache_order.append(seg_dir)
-        return _index_cache[seg_dir]
-    indexes = load_indexes(seg_dir)
-    _index_cache[seg_dir] = indexes
-    _index_cache_order.append(seg_dir)
-    while len(_index_cache_order) > INDEX_CACHE_MAX:
-        old = _index_cache_order.pop(0)
-        _index_cache.pop(old, None)
-    return indexes
+        while len(_index_cache_order) > INDEX_CACHE_MAX:
+            old = _index_cache_order.pop(0)
+            _index_cache.pop(old, None)
+        return indexes
+
+
+def unload_segment(seg_dir, indexes=None):
+    """卸载指定段；indexes 用于避免并发请求误删后来重新加载的实例。"""
+    with _index_cache_lock:
+        current = _index_cache.get(seg_dir)
+        if current is None or (indexes is not None and current is not indexes):
+            return
+        _index_cache.pop(seg_dir, None)
+        if seg_dir in _index_cache_order:
+            _index_cache_order.remove(seg_dir)
+
+
+def unload_index_path(base):
+    prefix = os.path.abspath(base)
+    with _index_cache_lock:
+        for seg_dir in list(_index_cache):
+            absolute = os.path.abspath(seg_dir)
+            if absolute == prefix or absolute.startswith(prefix + os.sep):
+                _index_cache.pop(seg_dir, None)
+                if seg_dir in _index_cache_order:
+                    _index_cache_order.remove(seg_dir)
+
+
+def index_metadata(index_path):
+    path = os.path.join(index_path, 'index_meta.json')
+    data = _load_json(path, {})
+    value = data.get('segment_size_mb')
+    return int(value) if isinstance(value, (int, float)) and value >= 0 else None
 
 
 def resolve_index(name, segment=None):
@@ -180,7 +222,7 @@ def version():
 
 @app.get('/api/settings')
 def settings_get():
-    return get_settings()
+    return {**get_settings(), 'data_dir': DATA_DIR, 'app_dir': APP_DIR}
 
 
 class SettingsModel(BaseModel):
@@ -188,6 +230,7 @@ class SettingsModel(BaseModel):
     lang: str | None = None
     dark: bool | None = None
     theme: str | None = None
+    unload_index_after_search: bool | None = None
 
 
 @app.put('/api/settings')
@@ -203,20 +246,27 @@ def settings_put(m: SettingsModel):
 
 
 @app.get('/api/indexes')
-def indexes_list():
+def indexes_list(include_stats: bool = Query(True), refresh_stats: bool = Query(False)):
     reg = get_registry()
     out = []
     for name, base in sorted(reg.items()):
         segments, seg_names = list_index_segments(base)
         seg_info = []
         for seg, sn in zip(segments, seg_names):
+            if not include_stats:
+                seg_info.append(dict(name=sn, files=None, hashes=None, size=None))
+                continue
             try:
+                if refresh_stats:
+                    getattr(index_stats, '_cache', {}).pop(seg, None)
                 st = index_stats(seg)
                 seg_info.append(dict(name=sn, **st))
             except Exception:
                 seg_info.append(dict(name=sn, files=0, hashes=0, size=0))
         out.append(dict(name=name, path=base, segments=seg_info,
-                        total_hashes=sum(s['hashes'] for s in seg_info)))
+                        segment_size_mb=index_metadata(base),
+                        total_hashes=(sum(s['hashes'] or 0 for s in seg_info)
+                                      if include_stats else None)))
     return out
 
 
@@ -246,14 +296,18 @@ def indexes_delete(name: str, delete_files: bool = Query(False)):
     reg = get_registry()
     if name not in reg:
         raise HTTPException(404, f'索引不存在: {name}')
-    base = reg.pop(name)
-    save_registry(reg)
+    base = reg[name]
     default_root = os.path.abspath(get_settings()['default_index_dir'])
     if delete_files and os.path.isdir(base):
         if os.path.abspath(base).startswith(default_root + os.sep):
-            shutil.rmtree(base, ignore_errors=True)
+            pass
         else:
-            raise HTTPException(400, '索引不在默认索引目录内，为安全起见未删除文件，仅移除注册')
+            raise HTTPException(400, '索引不在默认索引目录内，为安全起见未删除文件')
+    reg.pop(name)
+    save_registry(reg)
+    unload_index_path(base)
+    if delete_files and os.path.isdir(base):
+        shutil.rmtree(base, ignore_errors=True)
     return {'ok': True}
 
 
@@ -267,7 +321,7 @@ class BuildStartModel(BaseModel):
     name: str = Field(min_length=1)
     src_dir: str = Field(min_length=1)
     threads: int = 8
-    ram_gb: float = 0
+    segment_size_mb: int = Field(default=0, ge=0, le=1048576)
     recursive: bool = False
     incremental: bool = False
 
@@ -281,16 +335,27 @@ def build_start(m: BuildStartModel):
         src = os.path.abspath(m.src_dir)
         if not os.path.isdir(src):
             raise HTTPException(400, '音频目录不存在')
-        out_dir = os.path.join(get_settings()['default_index_dir'], m.name)
+        reg = get_registry()
+        if m.incremental:
+            if m.name not in reg:
+                raise HTTPException(404, f'索引不存在: {m.name}')
+            out_dir = reg[m.name]
+        else:
+            if m.name in reg:
+                raise HTTPException(400, f'索引名已存在: {m.name}')
+            out_dir = os.path.join(get_settings()['default_index_dir'], m.name)
         os.makedirs(out_dir, exist_ok=True)
+        unload_index_path(out_dir)
+        invalidate_index_stats(out_dir)
         progress_file = os.path.join(TMP_DIR, f'build_{uuid.uuid4().hex[:8]}.jsonl')
         log_file = os.path.join(TMP_DIR, f'build_{uuid.uuid4().hex[:8]}.log')
         cmd = [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                             'build_index.py'),
                src, '--out', out_dir, '--workers', str(m.threads),
                '--job', progress_file]
-        if m.ram_gb > 0:
-            cmd += ['--ram-gb', str(m.ram_gb)]
+        cmd += ['--segment-size-mb', str(m.segment_size_mb)]
+        if m.incremental:
+            cmd.append('--incremental')
         if m.recursive:
             cmd.append('--recursive')
         flags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
@@ -300,13 +365,13 @@ def build_start(m: BuildStartModel):
         proc = subprocess.Popen(cmd, stdout=log_f, stderr=subprocess.STDOUT,
                                 creationflags=flags, env=env)
         _build_job = dict(
-            name=m.name, src_dir=src, out_dir=out_dir, ram_gb=m.ram_gb,
+            name=m.name, src_dir=src, out_dir=out_dir,
+            segment_size_mb=m.segment_size_mb,
             threads=m.threads, recursive=m.recursive,
             proc=proc, log_file=log_file, progress_file=progress_file,
             started=time.time(), last='', processed=0, total=0,
             done=0, failed=0, skipped=0, finished=False,
         )
-        reg = get_registry()
         if m.name not in reg:
             reg[m.name] = out_dir
             save_registry(reg)
@@ -357,7 +422,8 @@ def build_status():
         return {
             'running': running,
             'name': job['name'], 'src_dir': job['src_dir'], 'out_dir': job['out_dir'],
-            'threads': job['threads'], 'ram_gb': job['ram_gb'],
+            'threads': job['threads'],
+            'segment_size_mb': job['segment_size_mb'],
             'last': job['last'], 'processed': job['processed'], 'total': job['total'],
             'done': job['done'], 'failed': job['failed'], 'skipped': job['skipped'],
             'elapsed': time.time() - job['started'],
@@ -476,33 +542,37 @@ def do_match(m: MatchModel):
     if not os.path.isfile(m.sample):
         raise HTTPException(400, '样本文件不存在')
     indexes = load_segment(seg_dir)
-    y = load_audio(m.sample)
-    if m.to_s is not None:
-        y = y[int(m.from_s * fp_core.SR):int(m.to_s * fp_core.SR)]
-    elif m.from_s > 0:
-        y = y[int(m.from_s * fp_core.SR):]
-    hs = extract_hashes(y)
-    occs = match_index(indexes, hs, min_aligned=m.min_aligned or fp_core.DEFAULT_MIN_ALIGNED,
-                       min_ratio=m.min_ratio)
-    by_id = {}
-    for idx in indexes:
-        for row in idx.files:
-            by_id[row[0]] = row
-    enriched = []
-    for o in occs:
-        fid, name, path, dur = by_id[o['file_id']]
-        o.update(name=name, path=path, file_duration=round(dur, 3))
-        o['ratio'] = min(1.0, o['ratio'])  # 置信度上限 100%
-        enriched.append(o)
-    add_history({
-        'time': time.strftime('%Y-%m-%d %H:%M:%S'),
-        'index_name': m.index_name, 'segment': seg_name,
-        'sample': m.sample, 'hash_count': len(hs),
-    }, enriched)
-    return {
-        'segment': seg_name, 'index_name': m.index_name,
-        'hash_count': len(hs), 'occurrences': enriched,
-    }
+    try:
+        y = load_audio(m.sample)
+        if m.to_s is not None:
+            y = y[int(m.from_s * fp_core.SR):int(m.to_s * fp_core.SR)]
+        elif m.from_s > 0:
+            y = y[int(m.from_s * fp_core.SR):]
+        hs = extract_hashes(y)
+        occs = match_index(indexes, hs, min_aligned=m.min_aligned or fp_core.DEFAULT_MIN_ALIGNED,
+                           min_ratio=m.min_ratio)
+        by_id = {}
+        for idx in indexes:
+            for row in idx.files:
+                by_id[row[0]] = row
+        enriched = []
+        for o in occs:
+            fid, name, path, dur = by_id[o['file_id']]
+            o.update(name=name, path=path, file_duration=round(dur, 3))
+            o['ratio'] = min(1.0, o['ratio'])
+            enriched.append(o)
+        add_history({
+            'time': time.strftime('%Y-%m-%d %H:%M:%S'),
+            'index_name': m.index_name, 'segment': seg_name,
+            'sample': m.sample, 'hash_count': len(hs),
+        }, enriched)
+        return {
+            'segment': seg_name, 'index_name': m.index_name,
+            'hash_count': len(hs), 'occurrences': enriched,
+        }
+    finally:
+        if get_settings().get('unload_index_after_search', False):
+            unload_segment(seg_dir, indexes)
 
 
 # ---------- 音频流（播放） ----------
@@ -517,7 +587,7 @@ def audio(path: str, offset: float | None = Query(None),
         return FileResponse(path)
     tmp = os.path.join(TMP_DIR, f'seg_{uuid.uuid4().hex[:8]}.wav')
     cmd = ['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y',
-           '-ss', f'{max(0.0, offset - 0.1):.3f}']
+           '-ss', f'{max(0.0, offset):.3f}']
     if duration and duration > 0:
         cmd += ['-t', f'{duration + 0.2:.3f}']
     cmd += ['-i', path, '-ac', '2', '-ar', '48000', tmp]

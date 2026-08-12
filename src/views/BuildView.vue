@@ -1,23 +1,23 @@
 <template>
-  <div>
+  <div class="page page-scroll">
     <h1 class="page-title">{{ t('build') }}</h1>
 
-    <FluentSegmented v-model="mode" :items="modeItems" />
+    <FluentSegmented class="build-mode" v-model="mode" :items="modeItems" />
 
     <!-- 新建 -->
     <div v-if="mode === 'new'" class="card">
       <div class="form-row">
         <FluentInput class="grow" :model-value="srcDir" :label="t('srcDir')" readonly />
-        <FluentButton @click="pickSrc"><Icon icon="fluent:folder-open-24-regular" :width="16" /></FluentButton>
+        <FluentButton variant="secondary" icon-only :title="t('browse')" @click="pickSrc"><Icon icon="fluent:folder-open-24-regular" :width="16" /></FluentButton>
       </div>
       <div class="form-row">
         <FluentInput v-model="name" :label="t('indexName')" placeholder="my_index" style="width: 220px" />
         <FluentNumberBox v-model="threads" :label="t('threads')" :min="1" :max="64" style="width: 120px" />
-        <FluentNumberBox v-model="ramGb" :label="t('ramGb')" :min="0" :max="256" style="width: 160px" />
+        <FluentNumberBox v-model="newSegmentSizeMb" :label="t('segmentSizeMb')" :description="t('segmentSizeHint')" :min="0" :max="1048576" :step="64" style="width: 190px" />
         <FluentToggleSwitch v-model="recursive" :label="t('scanSub')" />
       </div>
       <div class="form-row">
-        <FluentButton appearance="accent" :disabled="!canStart || jobRunning" @click="openWarn">
+        <FluentButton :disabled="!canStart || jobRunning" @click="openWarn">
           {{ t('buildStart') }}
         </FluentButton>
       </div>
@@ -29,11 +29,13 @@
       <div class="form-row" style="margin-top: 12px">
         <FluentComboBox class="grow" :items="incItems" v-model="incIndex" :label="t('incIndex')" />
         <FluentInput class="grow" :model-value="srcDir" :label="t('srcDir')" readonly />
-        <FluentButton @click="pickSrc"><Icon icon="fluent:folder-open-24-regular" :width="16" /></FluentButton>
+        <FluentButton variant="secondary" icon-only :title="t('browse')" @click="pickSrc"><Icon icon="fluent:folder-open-24-regular" :width="16" /></FluentButton>
       </div>
       <div class="form-row">
         <FluentNumberBox v-model="threads" :label="t('threads')" :min="1" :max="64" style="width: 120px" />
-        <FluentButton appearance="accent" :disabled="!canStartInc || jobRunning" @click="startIncremental">
+        <FluentNumberBox v-model="incSegmentSizeMb" :label="t('segmentSizeMb')" :description="t('segmentSizeHint')" :min="0" :max="1048576" :step="64" style="width: 190px" />
+        <FluentToggleSwitch v-model="recursive" :label="t('scanSub')" />
+        <FluentButton :disabled="!canStartInc || jobRunning" @click="startIncremental">
           {{ t('buildStart') }}
         </FluentButton>
       </div>
@@ -47,7 +49,7 @@
         <span>{{ t('threads') }}: {{ job.threads }}</span>
         <span>{{ t('elapsed') }}: {{ fmt(job.elapsed) }}</span>
         <span v-if="job.total">{{ t('progress') }}: {{ job.processed }}/{{ job.total }}</span>
-        <FluentButton v-if="job.running" compact appearance="accent" @click="cancelBuild">
+        <FluentButton v-if="job.running" variant="secondary" size="sm" @click="cancelBuild">
           {{ t('buildCancel') }}
         </FluentButton>
       </div>
@@ -65,15 +67,15 @@
     <FluentModal v-model="warnOpen" :title="t('warnTitle')">
       <p>{{ t('warnBody') }}</p>
       <template #footer>
-        <FluentButton appearance="accent" @click="warnOpen = false; startNew()">{{ t('warnConfirm') }}</FluentButton>
-        <FluentButton @click="warnOpen = false">{{ t('cancel') }}</FluentButton>
+        <FluentButton @click="warnOpen = false; startNew()">{{ t('warnConfirm') }}</FluentButton>
+        <FluentButton variant="secondary" @click="warnOpen = false">{{ t('cancel') }}</FluentButton>
       </template>
     </FluentModal>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import {
   FluentButton, FluentComboBox, FluentInfoBar, FluentInput,
   FluentModal, FluentNumberBox, FluentProgressBar, FluentSegmented, FluentToggleSwitch
@@ -82,6 +84,7 @@ import { Icon } from '@iconify/vue'
 import { t } from '../utils/i18n'
 import { api, pickDir } from '../utils/api'
 import { pushToast } from '../components/ToastHost.vue'
+import { indexState, refreshIndexes } from '../stores/indexes'
 
 const mode = ref('new')
 const modeItems = computed(() => [
@@ -92,11 +95,12 @@ const modeItems = computed(() => [
 const srcDir = ref('')
 const name = ref('')
 const threads = ref(8)
-const ramGb = ref(0)
+const newSegmentSizeMb = ref(0)
+const incSegmentSizeMb = ref(0)
 const recursive = ref(false)
 const warnOpen = ref(false)
 
-const indexes = ref([])
+const indexes = computed(() => indexState.items)
 const incIndex = ref('')
 const incItems = computed(() => indexes.value.map((i) => ({ label: i.name, value: i.name })))
 
@@ -127,20 +131,21 @@ async function pickSrc() {
 
 async function loadIndexes() {
   try {
-    indexes.value = await api.get('/api/indexes')
+    await refreshIndexes({ includeStats: false })
   } catch { /* 后端未就绪时静默 */ }
   if (!incIndex.value && incItems.value.length) incIndex.value = incItems.value[0].value
 }
 
 function openWarn() {
-  warnOpen.value = true
+  if (recursive.value) startNew()
+  else warnOpen.value = true
 }
 
 async function startNew() {
   try {
     await api.post('/api/build/start', {
       name: name.value, src_dir: srcDir.value, threads: threads.value,
-      ram_gb: ramGb.value, recursive: recursive.value, incremental: false
+      segment_size_mb: newSegmentSizeMb.value, recursive: recursive.value, incremental: false
     })
     pushToast({ title: t('building'), body: name.value })
     pollJob()
@@ -153,7 +158,7 @@ async function startIncremental() {
   try {
     await api.post('/api/build/start', {
       name: incIndex.value, src_dir: srcDir.value, threads: threads.value,
-      ram_gb: 0, recursive: recursive.value, incremental: true
+      segment_size_mb: incSegmentSizeMb.value, recursive: recursive.value, incremental: true
     })
     pushToast({ title: t('building'), body: incIndex.value })
     pollJob()
@@ -190,13 +195,18 @@ onMounted(() => {
   pollJob()
 })
 onUnmounted(() => clearTimeout(pollTimer))
+
+watch(incIndex, (name) => {
+  const index = indexes.value.find((item) => item.name === name)
+  incSegmentSizeMb.value = index?.segment_size_mb ?? 0
+})
 </script>
 
 <style scoped>
 .card {
   margin-top: 14px;
   padding: 18px;
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
   background: var(--bg-card-solid, #fff);
 }
@@ -215,4 +225,9 @@ onUnmounted(() => clearTimeout(pollTimer))
   gap: 12px;
   margin-bottom: 10px;
 }
+.build-mode { margin-bottom: 14px; }
+.build-mode :deep(.segmented-items) { overflow: hidden; }
+.build-mode :deep(.segmented-indicator) { width: calc(50% - 2px) !important; }
+.job-card { margin-bottom: 2px; }
+.job-card .mono { overflow-wrap: anywhere; }
 </style>

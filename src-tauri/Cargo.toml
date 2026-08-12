@@ -2,6 +2,9 @@
 name = "cyrene-audio-seeker"
 version = "26.0.0"
 description = "Cyreneの音频检索器 - 音频指纹检索工具"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/Cyrene2008/AudioSeeker"
+homepage = "https://github.com/Cyrene2008/AudioSeeker"
 edition = "2021"
 
 [lib]

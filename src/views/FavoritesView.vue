@@ -2,11 +2,11 @@
   <div class="page">
     <h1 class="page-title">{{ t('favTitle') }}</h1>
 
-    <div v-if="!favorites.length" class="empty">
+    <div v-if="loaded && !favorites.length" class="empty grow-area">
       <FluentEmptyState icon="fluent:star-24-regular" :title="t('favEmpty')" />
     </div>
 
-    <div class="table-wrap grow-area">
+    <div v-else-if="favorites.length" class="table-wrap grow-area">
       <table class="result-table">
         <thead>
           <tr>
@@ -17,7 +17,7 @@
             <th>{{ t('colSpan') }}</th>
             <th>{{ t('colRatio') }}</th>
             <th>收藏时间</th>
-            <th style="width: 200px">操作</th>
+            <th class="actions-column">操作</th>
           </tr>
         </thead>
         <tbody>
@@ -30,21 +30,21 @@
             <td class="mono">{{ Math.min(100, (f?.ratio || 0) * 100).toFixed(2) }}%</td>
             <td class="mono">{{ f?.added_at }}</td>
             <td @click.stop>
-              <FluentButton compact @click="play(f)"><Icon icon="fluent:play-24-regular" :width="14" /></FluentButton>
-              <FluentButton compact @click="exportOne(f)"><Icon icon="fluent:save-arrow-right-24-regular" :width="14" /></FluentButton>
-              <FluentButton compact @click="remove(f)"><Icon icon="fluent:star-off-24-regular" :width="14" /></FluentButton>
-              <FluentButton compact @click="reveal(f)"><Icon icon="fluent:folder-open-16-regular" :width="14" /></FluentButton>
+              <FluentButton variant="subtle" size="sm" icon-only :title="t('play')" @click="play(f)"><Icon icon="fluent:play-24-regular" :width="14" /></FluentButton>
+              <FluentButton variant="subtle" size="sm" icon-only :title="t('favExport')" @click="exportOne(f)"><Icon icon="fluent:save-arrow-right-24-regular" :width="14" /></FluentButton>
+              <FluentButton variant="subtle" size="sm" icon-only :title="t('favRemove')" @click="remove(f)"><Icon icon="fluent:star-off-24-regular" :width="14" /></FluentButton>
+              <FluentButton variant="subtle" size="sm" icon-only :title="t('reveal')" @click="reveal(f)"><Icon icon="fluent:folder-open-16-regular" :width="14" /></FluentButton>
             </td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <div class="action-bar">
-      <FluentButton compact @click="exportSelected">
+    <div v-if="favorites.length" class="action-bar">
+      <FluentButton variant="subtle" size="sm" :disabled="!selected.size" @click="exportSelected">
         <Icon icon="fluent:save-arrow-right-24-regular" :width="15" /> {{ t('favExport') }} ({{ selected.size }})
       </FluentButton>
-      <FluentButton compact :disabled="!selected.size" @click="removeSelected">
+      <FluentButton variant="subtle" size="sm" :disabled="!selected.size" @click="removeSelected">
         <Icon icon="fluent:star-off-24-regular" :width="15" /> {{ t('favRemove') }}
       </FluentButton>
     </div>
@@ -61,6 +61,7 @@ import { playTrack } from '../stores/player'
 import { pushToast } from '../components/ToastHost.vue'
 
 const favorites = ref([])
+const loaded = ref(false)
 const selected = reactive(new Set())
 
 function fmt(s) {
@@ -74,6 +75,7 @@ async function load() {
   try {
     favorites.value = await api.get('/api/favorites')
   } catch { /* 后端未就绪时静默 */ }
+  loaded.value = true
   selected.clear()
 }
 
@@ -81,7 +83,8 @@ function play(f) {
   playTrack({
     title: f.name,
     subtitle: `${f.index_name} · ${t('colOffset')} ${fmt(f?.offset)}`,
-    src: audioUrl(f.path, f.offset, Math.max(f.span, 3))
+    src: audioUrl(f.path),
+    startTime: f.offset
   })
 }
 
@@ -153,5 +156,5 @@ onMounted(load)
   background: var(--bg-card-solid, #fff);
 }
 .action-bar { display: flex; gap: 8px; margin-top: 12px; }
-.empty { margin-top: 60px; }
+.actions-column { width: 132px; }
 </style>

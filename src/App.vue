@@ -14,9 +14,7 @@
             <FluentButton @click="location.reload()">{{ t('refresh') }}</FluentButton>
           </div>
           <div v-if="bootLong" class="boot-skip">
-            <FluentButton appearance="subtle" @click="skipBoot">
-              跳过等待，直接进入界面（后端将在后台继续启动）
-            </FluentButton>
+            <FluentHyperlinkButton :label="t('skipBoot')" @click="skipBoot" />
           </div>
         </div>
       </div>
@@ -40,7 +38,7 @@
             severity="warning"
             :title="bootDetail"
             :closable="false"
-            style="margin: 0 16px"
+            class="backend-warning"
           />
         </div>
       </div>
@@ -53,7 +51,7 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { FluentButton, FluentInfoBar } from 'vue-fluent-widgets'
+import { FluentButton, FluentHyperlinkButton, FluentInfoBar } from 'vue-fluent-widgets'
 import bootAvatar from './assets/avatars/Cyrene2008.png'
 import TitleBar from './components/layout/TitleBar.vue'
 import Dock from './components/layout/Dock.vue'
@@ -164,9 +162,6 @@ onUnmounted(() => {
 .boot-skip {
   margin-top: 12px;
 }
-.boot-skip :deep(button) {
-  width: 100%;
-}
 .boot-logo {
   width: 88px;
   height: 88px;
@@ -204,4 +199,5 @@ onUnmounted(() => {
   font-size: 12px;
   word-break: break-all;
 }
+.backend-warning { margin: 0 16px 10px; }
 </style>

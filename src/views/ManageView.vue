@@ -1,15 +1,15 @@
 <template>
-  <div>
+  <div class="page page-scroll">
     <h1 class="page-title">{{ t('manageTitle') }}</h1>
 
     <div class="action-bar">
-      <FluentButton appearance="accent" @click="importOpen = true">
+      <FluentButton @click="importOpen = true">
         <Icon icon="fluent:arrow-import-24-regular" :width="16" /> {{ t('importIndex') }}
       </FluentButton>
-      <FluentButton @click="loadIndexes"><Icon icon="fluent:arrow-counterclockwise-24-regular" :width="16" /> {{ t('refresh') }}</FluentButton>
+      <FluentButton variant="secondary" :disabled="indexState.refreshing" @click="loadIndexes(true)"><Icon icon="fluent:arrow-counterclockwise-24-regular" :width="16" /> {{ t('refresh') }}</FluentButton>
     </div>
 
-    <div v-if="!indexes.length" class="empty">
+    <div v-if="indexState.loaded && !indexes.length" class="empty grow-area">
       <FluentEmptyState icon="fluent:library-24-regular" :title="t('manageEmpty')"
         :description="t('noIndex')" />
     </div>
@@ -21,7 +21,7 @@
             <div class="idx-name">{{ idx?.name }}</div>
             <div class="idx-path mono">{{ idx?.path }}</div>
           </div>
-          <FluentButton compact appearance="accent" @click="remove(idx)">
+          <FluentButton variant="subtle" size="sm" icon-only :title="t('delete')" @click="remove(idx)">
             <Icon icon="fluent:delete-24-regular" :width="15" />
           </FluentButton>
         </div>
@@ -37,19 +37,20 @@
         </div>
       </div>
     </div>
+    <div v-if="indexState.refreshing && indexes.length" class="refresh-note">{{ t('refreshingStats') }}</div>
 
     <FluentModal v-model="importOpen" :title="t('importIndex')">
       <div class="form-row">
         <FluentInput v-model="impName" :label="t('importName')" style="width: 180px" />
         <FluentInput class="grow" :model-value="impPath" :label="t('importPath')" readonly />
-        <FluentButton @click="pickImportPath"><Icon icon="fluent:folder-open-24-regular" :width="16" /></FluentButton>
+        <FluentButton variant="secondary" icon-only :title="t('browse')" @click="pickImportPath"><Icon icon="fluent:folder-open-24-regular" :width="16" /></FluentButton>
       </div>
       <p class="hint">{{ t('importHint') }}</p>
       <template #footer>
-        <FluentButton appearance="accent" :disabled="!impName || !impPath" @click="doImport">
+        <FluentButton :disabled="!impName || !impPath" @click="doImport">
           {{ t('importBtn') }}
         </FluentButton>
-        <FluentButton @click="importOpen = false">{{ t('cancel') }}</FluentButton>
+        <FluentButton variant="secondary" @click="importOpen = false">{{ t('cancel') }}</FluentButton>
       </template>
     </FluentModal>
 
@@ -69,7 +70,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import {
   FluentButton, FluentCheckBox, FluentContentDialog, FluentEmptyState,
   FluentInput, FluentModal
@@ -78,8 +79,9 @@ import { Icon } from '@iconify/vue'
 import { t } from '../utils/i18n'
 import { api, pickDir } from '../utils/api'
 import { pushToast } from '../components/ToastHost.vue'
+import { indexState, refreshIndexes } from '../stores/indexes'
 
-const indexes = ref([])
+const indexes = computed(() => indexState.items)
 const importOpen = ref(false)
 const impName = ref('')
 const impPath = ref('')
@@ -88,19 +90,22 @@ const delFiles = ref(false)
 const delTarget = ref(null)
 
 function fmtCount(n) {
+  if (n === null || n === undefined) return '—'
   if (n >= 1e8) return (n / 1e8).toFixed(1) + '亿'
   if (n >= 1e4) return (n / 1e4).toFixed(1) + '万'
   return String(n)
 }
 function fmtSize(n) {
+  if (n === null || n === undefined) return '—'
   if (n >= 1 << 30) return (n / (1 << 30)).toFixed(2) + ' GB'
   if (n >= 1 << 20) return (n / (1 << 20)).toFixed(1) + ' MB'
   return (n / 1024).toFixed(0) + ' KB'
 }
 
-async function loadIndexes() {
+async function loadIndexes(force = false) {
   try {
-    indexes.value = await api.get('/api/indexes')
+    if (!indexState.loaded) await refreshIndexes({ includeStats: false })
+    await refreshIndexes({ includeStats: true, refreshStats: force, force })
   } catch (e) {
     pushToast({ title: t('manageTitle') + '?', body: e.message })
   }
@@ -118,7 +123,7 @@ async function doImport() {
     importOpen.value = false
     impName.value = ''
     impPath.value = ''
-    loadIndexes()
+    await loadIndexes(true)
   } catch (e) {
     pushToast({ title: t('importBtn') + '?', body: e.message })
   }
@@ -133,7 +138,7 @@ async function doDelete() {
   try {
     await api.delete(`/api/indexes/${encodeURIComponent(delTarget.value.name)}?delete_files=${delFiles.value}`)
     pushToast({ title: t('delete'), body: delTarget.value.name })
-    loadIndexes()
+    await loadIndexes(true)
   } catch (e) {
     pushToast({ title: t('delete') + '?', body: e.message })
   }
@@ -144,18 +149,18 @@ onMounted(loadIndexes)
 </script>
 
 <style scoped>
-.action-bar { display: flex; gap: 8px; margin-bottom: 16px; }
+.action-bar { display: flex; gap: 8px; margin: 0 0 16px; flex-wrap: wrap; }
 .cards { display: flex; flex-direction: column; gap: 12px; }
 .idx-card {
   padding: 16px 18px;
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
   background: var(--bg-card-solid, #fff);
 }
 .idx-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .idx-name { font-size: 15px; font-weight: 600; }
 .idx-path { font-size: 12px; color: var(--text-secondary); margin-top: 2px; word-break: break-all; }
-.idx-stats { display: flex; gap: 24px; margin-top: 10px; font-size: 13px; color: var(--text-secondary); }
+.idx-stats { display: flex; gap: 24px; margin-top: 10px; font-size: 13px; color: var(--text-secondary); flex-wrap: wrap; }
 .idx-stats b { color: var(--text-primary); }
 .seg-list {
   margin-top: 8px;
@@ -167,6 +172,6 @@ onMounted(loadIndexes)
   flex-direction: column;
   gap: 2px;
 }
-.empty { margin-top: 60px; }
 .hint { font-size: 12px; color: var(--text-secondary); }
+.refresh-note { margin-top: 10px; color: var(--text-secondary); font-size: 12px; }
 </style>

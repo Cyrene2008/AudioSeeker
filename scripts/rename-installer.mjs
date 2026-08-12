@@ -1,4 +1,4 @@
-// 构建后把 NSIS 安装包重命名为 CyreneAudioSeeker_<版本>_x64-setup.exe
+// 构建后把 NSIS 安装包重命名为 AudioSeeker_<版本>_x64-setup.exe
 // 版本号从 src-tauri/tauri.conf.json 读取（与 Cargo.toml 保持一致）
 import { readFileSync, readdirSync, renameSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
@@ -11,7 +11,7 @@ const nsisDir = join(root, 'src-tauri', 'target', 'release', 'bundle', 'nsis')
 const conf = JSON.parse(readFileSync(join(root, 'src-tauri', 'tauri.conf.json'), 'utf-8'))
 const version = conf.version
 
-const targetName = `CyreneAudioSeeker_${version}_x64-setup.exe`
+const targetName = `AudioSeeker_${version}_x64-setup.exe`
 const target = join(nsisDir, targetName)
 rmSync(target, { force: true })
 

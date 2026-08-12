@@ -2,7 +2,7 @@
   <div class="page">
     <h1 class="page-title">{{ t('search') }}</h1>
 
-    <FluentSegmented :model-value="mode" :items="modeItems" @update:model-value="mode = $event" style="margin-bottom: 14px" />
+    <FluentSegmented class="two-option-segmented" :model-value="mode" :items="modeItems" @update:model-value="mode = $event" />
 
     <!-- ============ 检索 ============ -->
     <template v-if="mode === 'search'">
@@ -15,7 +15,7 @@
         :placeholder="t('indexPlaceholder')"
       />
       <FluentInput class="grow" :model-value="sample" :label="t('sample')" placeholder="*.wav / *.mp3 / *.flac…" readonly />
-      <FluentButton @click="pickSample"><Icon icon="fluent:folder-open-24-regular" :width="16" /></FluentButton>
+      <FluentButton variant="secondary" icon-only :title="t('browse')" @click="pickSample"><Icon icon="fluent:folder-open-24-regular" :width="16" /></FluentButton>
     </div>
 
     <div class="form-row">
@@ -23,7 +23,8 @@
       <FluentInput v-model.number="toS" type="number" :label="t('toSec')" :placeholder="t('toEnd')" :min="0" />
       <FluentInput v-model.number="minAligned" type="number" :label="t('minAligned')" :min="1" />
       <FluentInput v-model.number="minRatio" type="number" :label="t('minRatio')" :placeholder="t('autoRatio')" :min="0" />
-      <FluentButton :appearance="'accent'" :disabled="busy" @click="doMatch">
+      <FluentButton class="match-button" :disabled="busy" @click="doMatch">
+        <FluentProgressRing v-if="busy" :size="16" />
         {{ busy ? t('matching') : t('startMatch') }}
       </FluentButton>
     </div>
@@ -31,6 +32,9 @@
     <FluentInfoBar v-if="!indexes.length && !busy && backendUp.ready" severity="warning" :title="t('noIndex')" />
     <FluentInfoBar v-if="!backendUp.ready && !busy" severity="warning" title="正在连接后端…" style="margin-top:6px">
       <template #default>首次启动需等待后端初始化（加载索引通常需要 10~30 秒），完成后此提示会自动消失。</template>
+    </FluentInfoBar>
+    <FluentInfoBar v-if="searchError && !busy" severity="error" :title="t('searchFailed')">
+      <template #default>{{ searchError }}</template>
     </FluentInfoBar>
 
     <div v-if="lastMeta" class="result-toolbar">
@@ -54,13 +58,17 @@
             <th>{{ t('colRatio') }}</th>
             <th>{{ t('colDur') }}</th>
             <th>{{ t('indexName') }}</th>
-            <th style="width: 220px">{{ t('colActions') }}</th>
+            <th style="width: 112px">{{ t('colActions') }}</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="!displayRows.length">
             <td colspan="10" style="text-align: center; color: var(--text-secondary); padding: 40px">
-              {{ busy ? t('searching') : (searched ? t('emptyResult') : t('noResult')) }}
+              <div v-if="busy" class="matching-state">
+                <FluentProgressRing :size="24" />
+                <span>{{ t('searching') }}</span>
+              </div>
+              <template v-else>{{ searched ? t('emptyResult') : t('noResult') }}</template>
             </td>
           </tr>
           <tr v-for="(o, i) in displayRows" :key="o._key" :class="{ selected: selected.has(i) }" @click="toggleRow(i)">
@@ -78,7 +86,7 @@
             <td>{{ (o?.index_name || selectedIndex) }}</td>
             <td @click.stop>
               <FluentButton variant="subtle" size="sm" icon-only :title="t('play')" @click="playOcc(o)"><Icon icon="fluent:play-24-regular" :width="14" /></FluentButton>
-              <FluentButton variant="subtle" size="sm" icon-only :title="t('favorite')" @click="favoriteOcc(o)"><Icon :icon="isFavorited(o) ? 'fluent:star-24-filled' : 'fluent:star-24-regular'" :width="14" /></FluentButton>
+              <FluentButton variant="subtle" size="sm" icon-only :title="isFavorited(o) ? t('favRemove') : t('favorite')" @click="toggleFavorite(o)"><Icon :icon="isFavorited(o) ? 'fluent:star-24-filled' : 'fluent:star-24-regular'" :width="14" /></FluentButton>
               <FluentButton variant="subtle" size="sm" icon-only :title="t('reveal')" @click="reveal(o)"><Icon icon="fluent:folder-open-16-regular" :width="14" /></FluentButton>
             </td>
           </tr>
@@ -137,14 +145,15 @@
 <script setup>
 import { computed, onMounted, reactive, ref, toRefs } from 'vue'
 import {
-  FluentButton, FluentComboBox, FluentEmptyState, FluentInfoBar, FluentInput, FluentSegmented,
-  FluentToggleSwitch
+  FluentButton, FluentComboBox, FluentEmptyState, FluentInfoBar, FluentInput,
+  FluentProgressRing, FluentSegmented, FluentToggleSwitch
 } from 'vue-fluent-widgets'
 import { Icon } from '@iconify/vue'
 import { t } from '../utils/i18n'
 import { api, audioUrl, pickFile, savePath, tauri } from '../utils/api'
 import { playTrack } from '../stores/player'
-import { searchState } from '../stores/search'
+import { searchState, startSearch } from '../stores/search'
+import { indexState, refreshIndexes } from '../stores/indexes'
 import { backendState, startBackendPoll } from '../stores/backend'
 import { pushToast } from '../components/ToastHost.vue'
 
@@ -156,7 +165,7 @@ const modeItems = computed(() => [
   { label: t('history'), value: 'history' }
 ])
 const historyList = ref([])
-const favoriteKeys = reactive(new Set())
+const favoriteIds = reactive(new Map())
 
 function basename(p) {
   if (!p) return '-'
@@ -205,9 +214,9 @@ const indexItems = computed(() => {
   }
   return items
 })
-const { indexes, selectedIndex, sample, fromS, toS, minAligned, minRatio,
-        mergeResults, occs, selected, lastMeta, searched } = toRefs(searchState)
-const busy = ref(false)
+const indexes = computed(() => indexState.items)
+const { selectedIndex, sample, fromS, toS, minAligned, minRatio,
+        mergeResults, occs, selected, lastMeta, searched, busy, error: searchError } = toRefs(searchState)
 const backendUp = backendState; startBackendPoll()
 
 const displayRows = computed(() => {
@@ -249,7 +258,7 @@ function fmt(s) {
 
 async function loadIndexes() {
   try {
-    indexes.value = await api.get('/api/indexes')
+    await refreshIndexes({ includeStats: false })
   } catch { /* 后端未就绪时静默 */ }
   if (!selectedIndex.value && indexItems.value.length) {
     selectedIndex.value = indexItems.value[0].value
@@ -275,7 +284,6 @@ async function doMatch() {
     pushToast({ title: t('sample') + '?' })
     return
   }
-  busy.value = true
   try {
     // 不预检健康，直接发请求（后端可能在加载大索引，health 会被阻塞导致误判）
     const { name, segment } = splitIndex(selectedIndex.value)
@@ -288,12 +296,8 @@ async function doMatch() {
       min_aligned: minAligned.value || 8,
       min_ratio: minRatio.value === '' ? null : Number(minRatio.value) / 100
     }
-    const r = await api.post('/api/match', body)
+    const r = await startSearch(body)
     backendUp.ready = true
-    lastMeta.value = r
-    occs.value = (r.occurrences || []).map((o) => ({ ...o, index_name: name, segment }))
-    selected.value.clear()
-    searched.value = true
   } catch (e) {
     const msg = String(e.message)
     if (msg.includes('Failed to fetch') || msg.includes('拒绝') || msg.includes('refused')) {
@@ -302,23 +306,29 @@ async function doMatch() {
     } else {
       pushToast({ title: '检索失败', body: msg })
     }
-  } finally {
-    busy.value = false
-  }
+  } finally { /* shared store owns busy state */ }
 }
 
 function playOcc(o) {
   playTrack({
     title: o.name,
     subtitle: `${t('colOffset')} ${fmt(o?.offset_file)}`,
-    src: audioUrl(o.path, o.offset_file, Math.max(o.span, 3))
+    src: audioUrl(o.path),
+    startTime: o.offset_file
   })
 }
 
-async function favoriteOcc(o) {
+async function toggleFavorite(o) {
   const key = favoriteKey(o)
-  if (favoriteKeys.has(key)) {
-    pushToast({ title: t('favAlready'), body: o.name })
+  const id = favoriteIds.get(key)
+  if (id) {
+    try {
+      await api.delete(`/api/favorites/${id}`)
+      favoriteIds.delete(key)
+      pushToast({ title: t('favRemove'), body: o.name })
+    } catch (e) {
+      pushToast({ title: t('favRemove') + '?', body: e.message })
+    }
     return
   }
   try {
@@ -327,7 +337,7 @@ async function favoriteOcc(o) {
       offset: o.offset_file, span: o.span, aligned: o.aligned, ratio: o.ratio
     })
     if (!result?.ok || !result?.id) throw new Error('Backend did not confirm the favorite')
-    favoriteKeys.add(key)
+    favoriteIds.set(key, result.id)
     pushToast({ title: t('favAdded'), body: o.name })
   } catch (e) {
     pushToast({ title: t('favFailed'), body: e.message })
@@ -336,7 +346,9 @@ async function favoriteOcc(o) {
 
 async function favoriteSelected() {
   const list = [...selected.value].map((i) => displayRows.value[i]).filter(Boolean)
-  for (const o of list) await favoriteOcc(o)
+  for (const o of list) {
+    if (!isFavorited(o)) await toggleFavorite(o)
+  }
   selected.value.clear()
 }
 
@@ -346,14 +358,14 @@ function favoriteKey(o) {
 }
 
 function isFavorited(o) {
-  return favoriteKeys.has(favoriteKey(o))
+  return favoriteIds.has(favoriteKey(o))
 }
 
 async function loadFavoriteKeys() {
   try {
     const favorites = await api.get('/api/favorites')
-    favoriteKeys.clear()
-    favorites.forEach((favorite) => favoriteKeys.add(favoriteKey(favorite)))
+    favoriteIds.clear()
+    favorites.forEach((favorite) => favoriteIds.set(favoriteKey(favorite), favorite.id))
   } catch { /* 后端未就绪时静默 */ }
 }
 
@@ -435,6 +447,11 @@ onMounted(() => {
 }
 .meta-line { font-size: 12px; color: var(--text-secondary); }
 .merge-count { margin-left: 5px; color: var(--text-secondary); font-size: 11px; }
+.matching-state { display: inline-flex; align-items: center; gap: 10px; }
+.match-button :deep(.progress-ring-indeterminate) { stroke: currentColor; }
+.two-option-segmented { margin-bottom: 14px; }
+.two-option-segmented :deep(.segmented-items) { overflow: hidden; }
+.two-option-segmented :deep(.segmented-indicator) { width: calc(50% - 2px) !important; }
 .table-wrap {
   overflow: auto;
   display: flex;

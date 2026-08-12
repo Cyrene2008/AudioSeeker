@@ -28,7 +28,7 @@ import { tauri } from '../../utils/api'
 defineProps({})
 defineEmits([])
 
-const GITHUB = 'https://github.com/Cyrene2008/CyreneAudioSeeker'
+const GITHUB = 'https://github.com/Cyrene2008/AudioSeeker'
 
 async function minimize() {
   if (tauri.isTauri) {
