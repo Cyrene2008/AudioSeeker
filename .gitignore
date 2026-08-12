@@ -13,6 +13,10 @@ dist-release/
 .vite/
 *.log
 
+# vendor 内的组件构建产物需要入库（作为 file: 依赖供 npm ci 使用）
+!vendor/vue-fluent-widgets/dist/
+!vendor/vue-fluent-widgets/dist/*
+
 # Rust / Tauri
 src-tauri/target/
 src-tauri/gen/
