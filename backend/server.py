@@ -402,6 +402,10 @@ def get_history():
     return _load_json(HISTORY_FILE, [])
 
 
+def save_history(h):
+    _save_json(HISTORY_FILE, h)
+
+
 def add_history(meta, occurrences):
     """保存一次检索到历史（元数据入 history.json，完整结果入 history/{id}.json）。"""
     os.makedirs(HISTORY_DIR, exist_ok=True)

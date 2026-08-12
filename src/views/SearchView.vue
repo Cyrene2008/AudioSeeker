@@ -28,9 +28,9 @@
       </FluentButton>
     </div>
 
-    <FluentInfoBar v-if="!indexes.length && !busy" severity="warning" :title="t('noIndex')" />
-    <FluentInfoBar v-if="!backendUp.ready" severity="error" title="后端服务未就绪" style="margin-top:6px" closable>
-      <template #default>后端服务未就绪或已断开，请检查程序是否启动。若持续出现，请尝试重启程序。</template>
+    <FluentInfoBar v-if="!indexes.length && !busy && backendUp.ready" severity="warning" :title="t('noIndex')" />
+    <FluentInfoBar v-if="!backendUp.ready && !busy" severity="warning" title="正在连接后端…" style="margin-top:6px">
+      <template #default>首次启动需等待后端初始化（加载索引通常需要 10~30 秒），完成后此提示会自动消失。</template>
     </FluentInfoBar>
 
     <div v-if="lastMeta" class="meta-line mono">
