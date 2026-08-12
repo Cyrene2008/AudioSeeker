@@ -29,6 +29,9 @@
     </div>
 
     <FluentInfoBar v-if="!indexes.length && !busy" severity="warning" :title="t('noIndex')" />
+    <FluentInfoBar v-if="!backendUp.ready" severity="error" title="后端服务未就绪" style="margin-top:6px" closable>
+      <template #default>后端服务未就绪或已断开，请检查程序是否启动。若持续出现，请尝试重启程序。</template>
+    </FluentInfoBar>
 
     <div v-if="lastMeta" class="meta-line mono">
       {{ t('hashCount') }}: {{ lastMeta.hash_count }} · {{ t('matched') }}: {{ occs.length }} {{ t('colAligned').toLowerCase() }}
@@ -131,9 +134,10 @@ import {
 } from 'vue-fluent-widgets'
 import { Icon } from '@iconify/vue'
 import { t } from '../utils/i18n'
-import { api, audioUrl, pickFile, savePath, tauri } from '../utils/api'
+import { api, audioUrl, pickFile, savePath, tauri, checkHealth } from '../utils/api'
 import { playTrack } from '../stores/player'
 import { searchState } from '../stores/search'
+import { backendState, startBackendPoll } from '../stores/backend'
 import { pushToast } from '../components/ToastHost.vue'
 
 const frameSec = 256 / 11025
@@ -195,6 +199,7 @@ const indexItems = computed(() => {
 const { indexes, selectedIndex, sample, fromS, toS, minAligned, minRatio,
         occs, selected, lastMeta, searched } = toRefs(searchState)
 const busy = ref(false)
+const backendUp = backendState; startBackendPoll()
 
 function fmt(s) {
   if (s === undefined || s === null || isNaN(s)) return '-'
@@ -233,6 +238,13 @@ async function doMatch() {
   }
   busy.value = true
   try {
+    const ok = await checkHealth()
+    backendUp.ready = ok
+    if (!ok) {
+      pushToast({ title: '后端服务未就绪', body: '请检查后端是否启动，或稍后重试' })
+      busy.value = false
+      return
+    }
     const { name, segment } = splitIndex(selectedIndex.value)
     const body = {
       index_name: name,
@@ -249,7 +261,13 @@ async function doMatch() {
     selected.value.clear()
     searched.value = true
   } catch (e) {
-    pushToast({ title: t('searching'), body: e.message })
+    const msg = String(e.message)
+    if (msg.includes('Failed to fetch') || msg.includes('拒绝') || msg.includes('refused')) {
+      backendUp.ready = false
+      pushToast({ title: '后端服务未响应', body: '程序后端可能未启动或已崩溃，请重启程序。若持续出现此问题，检查是否有端口占用。' })
+    } else {
+      pushToast({ title: '检索失败', body: msg })
+    }
   } finally {
     busy.value = false
   }
@@ -328,8 +346,19 @@ async function doExport(list) {
 }
 
 onMounted(() => {
-  loadIndexes()
   loadHistoryList()
+  startBackendPoll()
+  // 后端就绪后加载索引（带延迟重试）
+  const tryLoad = async (retries) => {
+    for (let i = 0; i < retries; i++) {
+      if (backendUp.ready) {
+        loadIndexes()
+        return
+      }
+      if (i < retries - 1) await new Promise(r => setTimeout(r, 3000))
+    }
+  }
+  tryLoad(5)
 })
 </script>
 

@@ -14,11 +14,25 @@ let portReady = null
 async function ensurePort() {
   if (portReady) return portReady
   portReady = (async () => {
-    const p = await invoke('backend_port')
-    if (p) port = p
+    try {
+      const p = await invoke('backend_port')
+      if (p) port = p
+    } catch { /* 浏览器模式或 Tauri 未就绪，用默认端口 */ }
     window.__CYRENE_PORT__ = port
   })()
   await portReady
+}
+
+export async function checkHealth() {
+  await ensurePort()
+  try {
+    const resp = await fetch(`${apiBase()}/api/health`, { signal: AbortSignal.timeout(3000) })
+    if (!resp.ok) return false
+    const d = await resp.json()
+    return d && d.ok === true
+  } catch {
+    return false
+  }
 }
 
 export const tauri = { isTauri, invoke }
