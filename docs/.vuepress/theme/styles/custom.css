@@ -78,7 +78,9 @@ a:hover {
 }
 
 .vp-home-doc-hero .name {
-  font-size: 4rem !important;
+  font-size: clamp(2rem, 2.4rem + 1.6vw, 3.4rem) !important;
+  white-space: nowrap;
+  line-height: 1.2;
 }
 
 .vp-home-doc-hero .text {
@@ -91,7 +93,7 @@ a:hover {
 
 @media screen and (max-width: 768px) {
   .vp-home-doc-hero .name {
-    font-size: 2.7rem !important;
+    font-size: 1.9rem !important;
   }
 
   .vp-home-doc-hero .text {

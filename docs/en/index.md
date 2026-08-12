@@ -12,7 +12,7 @@ config:
         - theme: brand
           text: Download
           icon: lucide:download
-          link: https://github.com/Cyrene2008/AudioSeeker/releases
+          link: /en/download.html
         - theme: alt
           text: Documentation
           icon: lucide:list-start

@@ -13,14 +13,14 @@ const zhNavbar = defineNavbarConfig([
     link: '/doc/guide/start',
   },
   {
-    text: '功能',
-    icon: 'lucide:sparkles',
-    link: '/doc/guide/features',
+    text: '技术说明',
+    icon: 'lucide:file-code',
+    link: '/doc/guide/technical',
   },
   {
     text: '下载',
     icon: 'ic:outline-download',
-    link: 'https://github.com/Cyrene2008/AudioSeeker/releases',
+    link: '/download.html',
   },
 ])
 
@@ -31,9 +31,14 @@ const enNavbar = defineNavbarConfig([
     link: '/en/doc/guide/start',
   },
   {
+    text: 'Technical',
+    icon: 'lucide:file-code',
+    link: '/en/doc/guide/technical',
+  },
+  {
     text: 'Download',
     icon: 'ic:outline-download',
-    link: 'https://github.com/Cyrene2008/AudioSeeker/releases',
+    link: '/en/download.html',
   },
 ])
 

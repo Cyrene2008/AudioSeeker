@@ -77,6 +77,7 @@ export default defineUserConfig({
               items: [
                 { text: '快速开始', link: '/doc/guide/start' },
                 { text: '功能说明', link: '/doc/guide/features' },
+                { text: '技术说明', link: '/doc/guide/technical' },
               ],
             },
           ],
@@ -85,12 +86,14 @@ export default defineUserConfig({
       '/en/': {
         nav: enNavbar,
         sidebar: {
-          '/doc/': [
+          '/en/doc/': [
             {
               text: 'Guide',
               link: '/doc/guide/start',
               items: [
                 { text: 'Getting Started', link: '/doc/guide/start' },
+                { text: 'Features', link: '/doc/guide/features' },
+                { text: 'Technical Notes', link: '/doc/guide/technical' },
               ],
             },
           ],
