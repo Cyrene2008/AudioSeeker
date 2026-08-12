@@ -15,6 +15,13 @@ fn reveal_in_explorer(path: String) {
 }
 
 #[tauri::command]
+fn open_path(path: String) {
+    let _ = std::process::Command::new("explorer")
+        .arg(&path)
+        .spawn();
+}
+
+#[tauri::command]
 fn backend_port() -> u16 {
     backend::state()
         .lock()
@@ -87,6 +94,7 @@ pub fn run() {
             backend::app_version,
             backend_port,
             reveal_in_explorer,
+            open_path,
         ])
         .on_window_event(|_window, event| {
             if let tauri::WindowEvent::Destroyed = event {

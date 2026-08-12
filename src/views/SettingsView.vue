@@ -3,19 +3,19 @@
     <h1 class="page-title">{{ t('settings') }}</h1>
 
     <div class="settings-list">
-      <FluentSettingsCard :title="t('darkMode')" icon="dark-theme-20-regular">
+      <FluentSettingsCard :title="t('darkMode')" icon="fluent:dark-theme-20-regular">
         <template #action>
           <FluentToggleSwitch :model-value="settings.dark" @update:model-value="(v) => updateSettings({ dark: v })" />
         </template>
       </FluentSettingsCard>
 
-      <FluentSettingsCard :title="t('language')" icon="local-language-20-regular">
+      <FluentSettingsCard :title="t('language')" icon="fluent:local-language-20-regular">
         <template #action>
           <FluentSelect :model-value="settings.lang" :options="langItems" width="180px" @update:model-value="(v) => updateSettings({ lang: v })" />
         </template>
       </FluentSettingsCard>
 
-      <FluentSettingsCard :title="t('defaultIndexDir')" :description="t('changeDirHint')" icon="folder-20-regular">
+      <FluentSettingsCard :title="t('defaultIndexDir')" :description="t('changeDirHint')" icon="fluent:folder-20-regular">
         <template #action>
           <FluentButton variant="secondary" @click="changeIndexDir">
             <Icon icon="fluent:folder-open-24-regular" :width="16" /> {{ t('changeDir') }}
@@ -24,13 +24,13 @@
         <div class="mono set-path">{{ settings.default_index_dir || '—' }}</div>
       </FluentSettingsCard>
 
-      <FluentSettingsCard :title="t('unloadIndexAfterSearch')" :description="t('unloadIndexAfterSearchHint')" icon="database-arrow-down-20-regular">
+      <FluentSettingsCard :title="t('unloadIndexAfterSearch')" :description="t('unloadIndexAfterSearchHint')" icon="fluent:database-arrow-down-20-regular">
         <template #action>
           <FluentToggleSwitch :model-value="settings.unload_index_after_search" @update:model-value="(v) => updateSettings({ unload_index_after_search: v })" />
         </template>
       </FluentSettingsCard>
 
-      <FluentSettingsCard :title="`${t('checkUpdate')} · v${version}`" icon="arrow-circle-down-20-regular">
+      <FluentSettingsCard :title="`${t('checkUpdate')} · v${version}`" icon="fluent:arrow-circle-down-20-regular">
         <template #action>
           <FluentButton variant="secondary" :disabled="updateState.checking" @click="doCheck">
             <Icon icon="fluent:arrow-circle-down-24-regular" :width="16" />
@@ -45,7 +45,7 @@
         <div v-else-if="updateState.error" class="set-hint">{{ t('updateFail') }}: {{ updateState.error }}</div>
       </FluentSettingsCard>
 
-      <FluentSettingsCard :title="t('openBackend')" icon="folder-open-20-regular">
+      <FluentSettingsCard :title="t('openBackend')" icon="fluent:folder-open-20-regular">
         <template #action>
           <FluentButton variant="subtle" icon-only :title="t('openBackend')" @click="openDataDir">
             <Icon icon="fluent:folder-open-24-regular" :width="16" />
@@ -97,9 +97,23 @@ async function doCheck() {
   else pushToast({ title: t('upToDate'), body: `v${result.version}` })
 }
 
-function openDataDir() {
-  if (tauri.isTauri && dataDir.value) {
-    import('@tauri-apps/plugin-opener').then(({ openUrl }) => openUrl(dataDir.value))
+async function openDataDir() {
+  if (!tauri.isTauri) return
+  if (!dataDir.value) {
+    try {
+      const result = await api.get('/api/settings')
+      dataDir.value = result.data_dir || ''
+    } catch { /* ignore */ }
+  }
+  if (!dataDir.value) {
+    pushToast({ title: t('openBackend') + '?', body: '数据目录尚未就绪，请稍后重试' })
+    return
+  }
+  try {
+    const { invoke } = await import('@tauri-apps/api/core')
+    await invoke('open_path', { path: dataDir.value })
+  } catch (e) {
+    pushToast({ title: t('openBackend') + '?', body: e.message })
   }
 }
 
