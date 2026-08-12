@@ -9,7 +9,10 @@
 
 Cyrene's Audio Seeker is a Windows desktop search tool for large audio libraries. It builds local fingerprint indexes and locates original files and offsets from short clips, long mixes, extracted recordings, or re-encoded samples.
 
-Repository: <https://github.com/Cyrene2008/AudioSeeker>
+> [!CAUTION]
+> Made with ❤️ by [Cyrene2008](https://github.com/Cyrene2008)
+> 
+> Powered by [Vue Fluent Widgets](https://fluent.cyrene.hk)
 
 ## Features
 
@@ -25,6 +28,20 @@ Repository: <https://github.com/Cyrene2008/AudioSeeker>
 - Play the complete source file starting from the matched offset.
 - Favorite, unfavorite, reveal, and stitch matching results.
 - Browse search history, manage indexes, switch languages, and check updates.
+
+## Screenshots
+
+<img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/f994206b-bd52-45e7-8123-a4b80831575e" />
+
+<img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/a955f98b-c042-489b-bc87-feb2f756dc19" />
+
+<img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/dce1c101-1239-4910-b4c7-72f11e73cad6" />
+
+<img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/87c4c1cb-27fa-4289-8d49-06dd2bb2e0d7" />
+
+<img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/dcc2abb5-1694-44cd-9b83-481408b01ef3" />
+
+<img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/89ce4576-9fb3-47ae-aa11-07de157662d8" />
 
 ## Requirements
 
