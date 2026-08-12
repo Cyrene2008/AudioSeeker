@@ -11,7 +11,10 @@
 
 Cyreneの音频检索器是一款面向大型音频素材库的 Windows 桌面检索工具。程序会为音频目录建立本地指纹索引，并从短片段、混剪、录屏提取音频或重编码样本中定位原始文件与时间偏移。
 
-仓库：<https://github.com/Cyrene2008/AudioSeeker>
+> [!CAUTION]
+> Made with ❤️ by [Cyrene2008](https://github.com/Cyrene2008)
+> 
+> Powered by [Vue Fluent Widgets](https://fluent.cyrene.hk)
 
 ## 主要功能
 
@@ -27,6 +30,20 @@ Cyreneの音频检索器是一款面向大型音频素材库的 Windows 桌面�
 - 支持从命中偏移开始播放完整源文件。
 - 支持收藏、取消收藏、资源管理器定位和结果拼接导出。
 - 提供检索历史、索引管理、中英文界面和更新检查。
+
+## 页面展示
+
+<img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/f994206b-bd52-45e7-8123-a4b80831575e" />
+
+<img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/a955f98b-c042-489b-bc87-feb2f756dc19" />
+
+<img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/dce1c101-1239-4910-b4c7-72f11e73cad6" />
+
+<img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/87c4c1cb-27fa-4289-8d49-06dd2bb2e0d7" />
+
+<img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/dcc2abb5-1694-44cd-9b83-481408b01ef3" />
+
+<img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/89ce4576-9fb3-47ae-aa11-07de157662d8" />
 
 ## 系统要求
 
