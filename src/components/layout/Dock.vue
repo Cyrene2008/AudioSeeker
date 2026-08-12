@@ -1,99 +1,145 @@
 <template>
-  <FluentNavigationView
-    class="dock"
-    :menu-items="menuItems"
-    :show-toggle-button="false"
-    :default-selected-item="route.path"
-  >
-    <template #footer>
-      <router-link to="/settings" class="dock-footer-item"
-        :class="{ active: route.path === '/settings' }" :title="t('settings')">
+  <nav class="dock">
+    <div class="dock-header">
+      <img :src="logo" class="dock-logo" alt="" draggable="false" />
+      <span class="dock-title">Cyrene</span>
+    </div>
+    <div class="dock-items">
+      <router-link
+        v-for="item in mainItems"
+        :key="item.to"
+        :to="item.to"
+        class="dock-item"
+        :class="{ active: route.path === item.to }"
+        :title="item.label"
+      >
+        <Icon :icon="item.icon" :width="20" />
+        <span class="dock-item-label">{{ item.label }}</span>
+      </router-link>
+    </div>
+    <div class="dock-footer">
+      <router-link
+        to="/settings"
+        class="dock-item"
+        :class="{ active: route.path === '/settings' }"
+        :title="t('settings')"
+      >
         <Icon icon="fluent:settings-24-regular" :width="20" />
-        <span class="dock-footer-label">{{ t('settings') }}</span>
+        <span class="dock-item-label">{{ t('settings') }}</span>
       </router-link>
-      <router-link to="/about" class="dock-footer-item"
-        :class="{ active: route.path === '/about' }" :title="t('about')">
+      <router-link
+        to="/about"
+        class="dock-item"
+        :class="{ active: route.path === '/about' }"
+        :title="t('about')"
+      >
         <Icon icon="fluent:info-24-regular" :width="20" />
-        <span class="dock-footer-label">{{ t('about') }}</span>
+        <span class="dock-item-label">{{ t('about') }}</span>
       </router-link>
-    </template>
-    <router-view v-slot="{ Component }">
-      <transition name="page-forward" mode="out-in">
-        <component :is="Component" />
-      </transition>
-    </router-view>
-  </FluentNavigationView>
+    </div>
+  </nav>
 </template>
 
 <script setup>
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { FluentNavigationView } from 'vue-fluent-widgets'
 import { Icon } from '@iconify/vue'
+import logo from '../../assets/avatars/Cyrene2008.png'
 import { t } from '../../utils/i18n'
 
 const route = useRoute()
 
-// 图标使用库内 FluentIcon 的裸图标名（FluentIcon 自动补 fluent: 前缀）
-const menuItems = computed(() => [
-  { id: '/search', label: t('search'), icon: 'search-24-regular', to: '/search' },
-  { id: '/build', label: t('build'), icon: 'folder-24-regular', to: '/build' },
-  { id: '/manage', label: t('manage'), icon: 'library-24-regular', to: '/manage' },
-  { id: '/favorites', label: t('favorites'), icon: 'star-24-regular', to: '/favorites' }
+const mainItems = computed(() => [
+  { to: '/search', icon: 'fluent:search-24-regular', label: t('search') },
+  { to: '/build', icon: 'fluent:folder-24-regular', label: t('build') },
+  { to: '/manage', icon: 'fluent:library-24-regular', label: t('manage') },
+  { to: '/favorites', icon: 'fluent:star-24-regular', label: t('favorites') }
 ])
 </script>
 
 <style scoped>
 .dock {
-  flex-shrink: 0;
-  height: 100%;
-  min-height: 0;
-}
-/* 内容区排版：内边距 + 弹性布局占满可用区域 + 内部滚动（组件自带 overflow:auto） */
-.dock :deep(.navigation-view-content) {
   display: flex;
   flex-direction: column;
-  padding: 20px 24px;
+  flex-shrink: 0;
+  width: 200px;
+  height: 100%;
+  border-right: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
+  background: var(--bg-card, rgba(255, 245, 252, 0.75));
+  font-family: var(--font-ui, system-ui, sans-serif);
+  overflow: hidden;
 }
-.dock :deep(.navigation-view-content > *) {
-  min-height: 0;
+.dock-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
 }
-.dock-footer-item {
+.dock-logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.dock-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #1f1f1f);
+  white-space: nowrap;
+}
+.dock-items {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 6px;
+  overflow-y: auto;
+}
+.dock-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 6px;
+  border-top: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
+}
+.dock-item {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
-  height: 36px;
+  gap: 10px;
+  height: 38px;
   padding: 0 12px;
-  margin: 2px 4px;
-  border-radius: 4px;
-  color: var(--text-primary, #3d1a2e);
+  border-radius: 8px;
+  color: var(--text-secondary, #6b3a55);
   text-decoration: none;
-  font-size: 14px;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
 }
-.dock-footer-item:hover {
+.dock-item:hover {
   background: var(--bg-hover, rgba(0, 0, 0, 0.05));
+  color: var(--text-primary, #1f1f1f);
 }
-.dock-footer-item.active {
-  background: var(--bg-hover, rgba(0, 0, 0, 0.05));
+.dock-item.active {
+  background: var(--accent-soft, rgba(234, 94, 193, 0.12));
   color: var(--accent, #ea5ec1);
 }
-.dock-footer-item.active::before {
+.dock-item.active::before {
   position: absolute;
-  left: -4px;
+  left: 0;
   top: 10px;
   width: 3px;
-  height: 16px;
-  border-radius: 2px;
+  height: 18px;
+  border-radius: 0 3px 3px 0;
   background: var(--accent, #ea5ec1);
   content: '';
 }
-.dock-footer-label {
-  flex: 1;
+.dock-item-label {
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 </style>

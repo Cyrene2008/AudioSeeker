@@ -26,6 +26,13 @@
       <TitleBar />
       <div class="app-body">
         <Dock />
+        <div class="app-content">
+          <router-view v-slot="{ Component }">
+            <transition name="page-forward" mode="out-in">
+              <component :is="Component" />
+            </transition>
+          </router-view>
+        </div>
       </div>
       <PlayerBar />
       <FluentInfoBar
