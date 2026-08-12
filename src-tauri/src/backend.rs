@@ -119,6 +119,19 @@ fn app_dirs(app: &tauri::AppHandle) -> (PathBuf, PathBuf) {
     (exe_dir, app_dir)
 }
 
+/// 旧标识符 cn.cyrene2008.audioseeker 的用户数据目录一次性迁移到新标识符目录。
+/// 仅在新区不存在、旧区存在时执行（Windows %APPDATA% 下同名卷，重命名即可）。
+fn migrate_legacy_app_dir(app_dir: &Path) {
+    if app_dir.exists() {
+        return;
+    }
+    let Ok(base) = std::env::var("APPDATA") else { return };
+    let legacy = Path::new(&base).join("cn.cyrene2008.audioseeker");
+    if legacy.is_dir() {
+        let _ = std::fs::rename(&legacy, app_dir);
+    }
+}
+
 /// 定位 backend 目录（打包资源 / 开发目录）。
 fn backend_dir(app: &tauri::AppHandle) -> Option<PathBuf> {
     let mut cands: Vec<PathBuf> = Vec::new();
@@ -599,6 +612,7 @@ fn start_backend(py: &Path, backend: &Path, port: u16, app_dir: &Path,
 
 pub fn run_bootstrap(app: &tauri::AppHandle) {
     let (exe_dir, app_dir) = app_dirs(app);
+    migrate_legacy_app_dir(&app_dir);
     let data_dir = app_dir.join("data");
     let _ = std::fs::create_dir_all(&data_dir);
     let backend = match backend_dir(app) {
