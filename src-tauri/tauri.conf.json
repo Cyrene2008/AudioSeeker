@@ -6,8 +6,8 @@
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
-    "beforeDevCommand": "npm run sync:backend && npm run dev",
-    "beforeBuildCommand": "npm run sync:backend && npm run build"
+    "beforeDevCommand": "bun run sync:backend && bun run dev",
+    "beforeBuildCommand": "bun run sync:backend && bun run build"
   },
   "app": {
     "withGlobalTauri": true,

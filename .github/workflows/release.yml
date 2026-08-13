@@ -13,10 +13,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: 22
-          cache: npm
+          bun-version-file: package.json
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -27,10 +26,10 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - run: npm ci
+      - run: bun install --frozen-lockfile
 
       - name: Build and package installer
-        run: npm run build:app
+        run: bun run build:app
         env:
           CI: true
 

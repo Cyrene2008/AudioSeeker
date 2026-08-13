@@ -124,15 +124,15 @@ Changing the default index location does not move existing or imported indexes.
 ## Development
 
 ```powershell
-npm install
-npm run sync:backend
-npm run tauri dev
+bun install
+bun run sync:backend
+bun run tauri dev
 ```
 
 Validation:
 
 ```powershell
-npm run build
+bun run build
 python -m py_compile backend/server.py backend/build_index.py
 cargo check --manifest-path src-tauri/Cargo.toml
 ```
@@ -140,7 +140,7 @@ cargo check --manifest-path src-tauri/Cargo.toml
 Package the application:
 
 ```powershell
-npm run build:app
+bun run build:app
 ```
 
 The NSIS installer is generated under `src-tauri/target/release/bundle/nsis/`.

@@ -154,15 +154,15 @@ Cyreneの音频检索器是一款面向大型音频素材库的 Windows 桌面�
 ### 启动
 
 ```powershell
-npm install
-npm run sync:backend
-npm run tauri dev
+bun install
+bun run sync:backend
+bun run tauri dev
 ```
 
 ### 验证
 
 ```powershell
-npm run build
+bun run build
 python -m py_compile backend/server.py backend/build_index.py
 cargo check --manifest-path src-tauri/Cargo.toml
 ```
@@ -170,7 +170,7 @@ cargo check --manifest-path src-tauri/Cargo.toml
 ### 打包
 
 ```powershell
-npm run build:app
+bun run build:app
 ```
 
 安装包输出到：
