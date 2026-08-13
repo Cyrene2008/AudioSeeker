@@ -4,6 +4,7 @@
 
 [English](README_EN.md) | **简体中文**
 
+[![Release](https://github.com/Cyrene2008/AudioSeeker/actions/workflows/release.yml/badge.svg)](https://github.com/Cyrene2008/AudioSeeker/actions/workflows/release.yml)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows-0078D4.svg)](#系统要求)
 [![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB.svg)](https://tauri.app/)
