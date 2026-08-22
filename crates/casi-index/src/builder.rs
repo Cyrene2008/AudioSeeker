@@ -232,7 +232,13 @@ struct HeapItem(Posting, usize);
 
 impl Ord for HeapItem {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        other.0.h.cmp(&self.0.h).then_with(|| other.1.cmp(&self.1))
+        // 按 (h, t) 有序：同 h 行 t 升序 → 检索时 delta 单调，可线性去重
+        other
+            .0
+            .h
+            .cmp(&self.0.h)
+            .then_with(|| other.0.t.cmp(&self.0.t))
+            .then_with(|| other.1.cmp(&self.1))
     }
 }
 impl PartialOrd for HeapItem {

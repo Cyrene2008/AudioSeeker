@@ -65,8 +65,11 @@ pub fn match_index(
         tq_min: u32,
         tq_max: u32,
     }
-    let mut acc: AHashMap<(u32, i64), Acc> = AHashMap::default();
 
+    // 单一遍历投票。postings 同 h 内按 t 升序（builder 保证）→ 对固定 tq，
+    // delta 单调非减 → 局部去重走线性扫描（零哈希），随后进全局 acc。
+    let mut acc: AHashMap<(u32, i64), Acc> = AHashMap::default();
+    let mut local_dedup: Vec<(i64, u32, u32)> = Vec::with_capacity(64);
     for index in indexes {
         for (&h, tqs) in &uniq {
             let range = index.lookup(h);
@@ -75,7 +78,6 @@ pub fn match_index(
             }
             let len = range.end - range.start;
             if len == 1 {
-                // 快速路径：单行命中
                 let p = index.posting(range.start);
                 for &tq in tqs {
                     let delta = p.t as i64 - tq as i64;
@@ -92,34 +94,32 @@ pub fn match_index(
                 }
                 continue;
             }
-            // 一般路径：delta 去重 + 首行文件归属（复刻 np.unique 语义）
+            // 一般路径：delta 单调 → 线性去重（语义 = np.unique：相同 delta
+            // 计一处、归属首次出现的行 fid；因 (h,t) 有序，首行即正确归属）
             for &tq in tqs {
-                let mut pairs: Vec<(i64, u32, usize)> = Vec::with_capacity(len);
-                for (i, irow) in (range.start..range.end).enumerate() {
+                local_dedup.clear();
+                let mut last_d: i64 = i64::MIN;
+                for irow in range.start..range.end {
                     let p = index.posting(irow);
-                    pairs.push((p.t as i64 - tq as i64, p.fid, i));
-                }
-                pairs.sort_by_key(|&(d, _, _)| d);
-                let mut k = 0;
-                while k < pairs.len() {
-                    let mut j = k;
-                    while j < pairs.len() && pairs[j].0 == pairs[k].0 {
-                        j += 1;
+                    let d = p.t as i64 - tq as i64;
+                    if d != last_d {
+                        local_dedup.push((d, p.fid, 1));
+                        last_d = d;
+                    } else if let Some(last) = local_dedup.last_mut() {
+                        last.2 += 1;
                     }
-                    let delta = pairs[k].0;
-                    let fid = pairs[k].1; // 首行（稳定排序 → 原行序最小编号）
-                    let cnt = (j - k) as u32;
-                    let key = (fid, delta);
+                }
+                for &(d, fid, cc) in local_dedup.iter() {
+                    let key = (fid, d);
                     let e = acc.entry(key).or_default();
                     let fresh = e.cnt == 0;
-                    e.cnt += cnt;
+                    e.cnt += cc;
                     if fresh {
                         e.tq_min = tq;
                     } else {
                         e.tq_min = e.tq_min.min(tq);
                     }
                     e.tq_max = e.tq_max.max(tq);
-                    k = j;
                 }
             }
         }

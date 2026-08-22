@@ -37,9 +37,14 @@
   "bundle": {
     "active": true,
     "targets": ["nsis"],
+    "license": "GPL-3.0-or-later",
+    "licenseFile": "../LICENSE",
     "windows": {
       "nsis": {
-        "installMode": "currentUser"
+        "installMode": "currentUser",
+        "languages": ["English", "SimpChinese"],
+        "displayLanguageSelector": false,
+        "installerIcon": "icons/icon.ico"
       }
     },
     "resources": {

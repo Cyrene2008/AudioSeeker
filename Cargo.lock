@@ -580,6 +580,7 @@ dependencies = [
  "ahash",
  "casi-core",
  "casi-index",
+ "rayon",
  "tempfile",
 ]
 

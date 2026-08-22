@@ -10,11 +10,24 @@
         <FluentInput class="grow" :model-value="srcDir" :label="t('srcDir')" readonly />
         <FluentButton variant="secondary" icon-only :title="t('browse')" @click="pickSrc"><Icon icon="fluent:folder-open-24-regular" :width="16" /></FluentButton>
       </div>
-      <div class="form-row">
-        <FluentInput v-model="name" :label="t('indexName')" placeholder="my_index" style="width: 220px" />
-        <FluentNumberBox v-model="threads" :label="t('threads')" :min="1" :max="64" style="width: 120px" />
-        <FluentNumberBox v-model="newSegmentSizeMb" :label="t('segmentSizeMb')" :description="t('segmentSizeHint')" :min="0" :max="1048576" :step="64" style="width: 190px" />
-        <FluentToggleSwitch v-model="recursive" :label="t('scanSub')" />
+      <div class="form-grid">
+        <div class="field">
+          <label class="field-label">{{ t('indexName') }}</label>
+          <FluentInput v-model="name" placeholder="my_index" />
+        </div>
+        <div class="field">
+          <label class="field-label">{{ t('threads') }}</label>
+          <FluentNumberBox v-model="threads" :min="1" :max="64" />
+        </div>
+        <div class="field">
+          <label class="field-label">{{ t('segmentSizeMb') }}</label>
+          <FluentNumberBox v-model="newSegmentSizeMb" :min="0" :max="1048576" :step="64" />
+          <div class="field-hint">{{ t('segmentSizeHint') }}</div>
+        </div>
+        <div class="field">
+          <label class="field-label field-label-empty" />
+          <FluentToggleSwitch v-model="recursive" :label="t('scanSub')" />
+        </div>
       </div>
       <div class="form-row">
         <FluentButton :disabled="!canStart || jobRunning" @click="openWarn">
@@ -31,13 +44,26 @@
         <FluentInput class="grow" :model-value="srcDir" :label="t('srcDir')" readonly />
         <FluentButton variant="secondary" icon-only :title="t('browse')" @click="pickSrc"><Icon icon="fluent:folder-open-24-regular" :width="16" /></FluentButton>
       </div>
-      <div class="form-row">
-        <FluentNumberBox v-model="threads" :label="t('threads')" :min="1" :max="64" style="width: 120px" />
-        <FluentNumberBox v-model="incSegmentSizeMb" :label="t('segmentSizeMb')" :description="t('segmentSizeHint')" :min="0" :max="1048576" :step="64" style="width: 190px" />
-        <FluentToggleSwitch v-model="recursive" :label="t('scanSub')" />
-        <FluentButton :disabled="!canStartInc || jobRunning" @click="startIncremental">
-          {{ t('buildStart') }}
-        </FluentButton>
+      <div class="form-grid">
+        <div class="field">
+          <label class="field-label">{{ t('threads') }}</label>
+          <FluentNumberBox v-model="threads" :min="1" :max="64" />
+        </div>
+        <div class="field">
+          <label class="field-label">{{ t('segmentSizeMb') }}</label>
+          <FluentNumberBox v-model="incSegmentSizeMb" :min="0" :max="1048576" :step="64" />
+          <div class="field-hint">{{ t('segmentSizeHint') }}</div>
+        </div>
+        <div class="field">
+          <label class="field-label field-label-empty" />
+          <FluentToggleSwitch v-model="recursive" :label="t('scanSub')" />
+        </div>
+        <div class="field">
+          <label class="field-label field-label-empty" />
+          <FluentButton :disabled="!canStartInc || jobRunning" @click="startIncremental">
+            {{ t('buildStart') }}
+          </FluentButton>
+        </div>
       </div>
     </div>
 
@@ -48,8 +74,7 @@
         <span>{{ t('indexName') }}: <b>{{ job.name }}</b></span>
         <span>{{ t('threads') }}: {{ job.threads }}</span>
         <span>{{ t('elapsed') }}: {{ fmt(job.elapsed) }}</span>
-        <span v-if="job.total">{{ t('progress') }}: {{ job.processed }}/{{ job.total }}</span>
-        <FluentButton v-if="job.running" variant="secondary" size="sm" @click="cancelBuild">
+        <span v-if="job.total">{{ t('progress') }}: {{ job.processed }}/{{ job.total }}</span>        <FluentButton v-if="job.running" variant="secondary" size="sm" @click="cancelBuild">
           {{ t('buildCancel') }}
         </FluentButton>
       </div>
@@ -119,8 +144,10 @@ function escapeHtml(s) {
 }
 
 function fmt(s) {
-  const m = Math.floor(s / 60)
-  const sec = Math.round(s % 60)
+  const n = Number(s)
+  if (!Number.isFinite(n) || n < 0) return '0:00'
+  const m = Math.floor(n / 60)
+  const sec = Math.round(n % 60)
   return `${m}:${String(sec).padStart(2, '0')}`
 }
 
@@ -170,15 +197,16 @@ async function startIncremental() {
 async function pollJob() {
   try {
     const prev = job.value
-    job.value = await api.get('/api/build/status')
-    if (job.value.log) jobLog.value = job.value.log
+    const data = await api.get('/api/build/status')
+    job.value = data && data.name ? data : null // 无任务时清爽隐藏
+    if (data && data.log) jobLog.value = data.log
     const wasRunning = prev && prev.running
-    if (job.value.running) {
+    if (data && data.running) {
       pollTimer = setTimeout(pollJob, 800)
-    } else if (job.value.name) {
+    } else if (data && data.name) {
       // 仅在本次运行中由"进行中→完成"转变时提示一次，切页回来不再重复弹
       if (wasRunning) {
-        pushToast({ title: t('buildDone'), body: job.value.name })
+        pushToast({ title: t('buildDone'), body: data.name })
       }
       loadIndexes()
     }
@@ -226,8 +254,34 @@ watch(incIndex, (name) => {
   margin-bottom: 10px;
 }
 .build-mode { margin-bottom: 14px; }
-.build-mode :deep(.segmented-items) { overflow: hidden; }
-.build-mode :deep(.segmented-indicator) { width: calc(50% - 2px) !important; }
 .job-card { margin-bottom: 2px; }
 .job-card .mono { overflow-wrap: anywhere; }
+
+/* 统一表单布局：label 固定顶部，行内对齐 */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px 18px;
+  margin: 16px 0 4px;
+  align-items: start;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.field-label {
+  font-size: 12px;
+  color: var(--text-secondary, #6b3a55);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.field-label-empty { height: 14px; }
+.field-hint {
+  font-size: 11px;
+  color: var(--text-tertiary, #9a7b8e);
+  line-height: 1.4;
+  max-width: 260px;
+}
 </style>

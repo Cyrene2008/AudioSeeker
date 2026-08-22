@@ -9,6 +9,7 @@ description = ".casi 检索引擎：时间偏移对齐投票 + 簇合并"
 casi-index.workspace = true
 casi-core.workspace = true
 ahash.workspace = true
+rayon.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

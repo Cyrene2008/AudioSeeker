@@ -50,25 +50,25 @@ export const tauri = { isTauri, invoke }
 
 export const apiBase = () => `http://127.0.0.1:${port}`
 
-// HTTP 路径 → Tauri command 映射
+// HTTP 路径 → Tauri command 映射（args 必须为 { 形参名: 值 }，Tauri 默认 camelCase）
 const COMMAND_MAP = [
   { get: '/api/settings', cmd: 'casi_settings_get', args: () => ({}) },
-  { put: '/api/settings', cmd: 'casi_settings_put', args: (body) => body },
-  { get: '/api/indexes', cmd: 'casi_indexes', args: (_, q) => ({ include_stats: q.get('include_stats') !== 'false' }) },
-  { post: '/api/indexes/import', cmd: 'casi_index_import', args: (body) => body },
-  { del: '/api/indexes/', cmd: 'casi_index_delete', args: (body, q, path) => ({ name: path.slice('/api/indexes/'.length), delete_files: q.get('delete_files') === 'true' }) },
-  { post: '/api/build/start', cmd: 'casi_build_start', args: (body) => body },
+  { put: '/api/settings', cmd: 'casi_settings_put', args: (body) => ({ payload: body }) },
+  { get: '/api/indexes', cmd: 'casi_indexes', args: (_, q) => ({ includeStats: q.get('include_stats') !== 'false' }) },
+  { post: '/api/indexes/import', cmd: 'casi_index_import', args: (body) => ({ payload: body }) },
+  { del: '/api/indexes/', cmd: 'casi_index_delete', args: (body, q, path) => ({ payload: { name: path.slice('/api/indexes/'.length), deleteFiles: q.get('delete_files') === 'true' } }) },
+  { post: '/api/build/start', cmd: 'casi_build_start', args: (body) => ({ payload: body }) },
   { get: '/api/build/status', cmd: 'casi_build_status', args: () => ({}) },
   { post: '/api/build/cancel', cmd: 'casi_build_cancel', args: () => ({}) },
-  { post: '/api/error-log', cmd: 'casi_error_log', args: (body) => body },
+  { post: '/api/error-log', cmd: 'casi_error_log', args: (body) => ({ payload: body }) },
   { get: '/api/history', cmd: 'casi_history_list', args: () => ({}) },
-  { get: '/api/history/', cmd: 'casi_history_get', args: (body, q, path) => ({ hid: path.slice('/api/history/'.length) }) },
-  { del: '/api/history/', cmd: 'casi_history_delete', args: (body, q, path) => ({ hid: path.slice('/api/history/'.length) }) },
-  { post: '/api/match', cmd: 'casi_match', args: (body) => body },
-  { post: '/api/export', cmd: 'casi_export', args: (body) => body },
+  { get: '/api/history/', cmd: 'casi_history_get', args: (body, q, path) => ({ payload: { hid: path.slice('/api/history/'.length) } }) },
+  { del: '/api/history/', cmd: 'casi_history_delete', args: (body, q, path) => ({ payload: { hid: path.slice('/api/history/'.length) } }) },
+  { post: '/api/match', cmd: 'casi_match', args: (body) => ({ payload: body }) },
+  { post: '/api/export', cmd: 'casi_export', args: (body) => ({ payload: body }) },
   { get: '/api/favorites', cmd: 'casi_favorites_get', args: () => ({}) },
-  { post: '/api/favorites', cmd: 'casi_favorites_add', args: (body) => body },
-  { del: '/api/favorites/', cmd: 'casi_favorites_delete', args: (body, q, path) => ({ fid: path.slice('/api/favorites/'.length) }) },
+  { post: '/api/favorites', cmd: 'casi_favorites_add', args: (body) => ({ payload: body }) },
+  { del: '/api/favorites/', cmd: 'casi_favorites_delete', args: (body, q, path) => ({ payload: { fid: path.slice('/api/favorites/'.length) } }) },
 ]
 
 function mapCommand(method, path, body) {
