@@ -114,9 +114,16 @@ async function doExport(list) {
   const out = await pickDir()
   if (!out) return
   try {
+    const seen = new Set()
+    const unique = list.filter((f) => {
+      const key = f.path
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
     await api.post('/api/export', {
       index_name: list[0].index_name, out_dir: out,
-      occurrences: list.map((f) => ({
+      occurrences: unique.map((f) => ({
         path: f.path,
         offset_file: f.offset, span: f.span, tq0: 0, tq1: 0
       }))
