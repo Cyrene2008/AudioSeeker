@@ -47,7 +47,7 @@ import { computed, onMounted, ref } from 'vue'
 
 const REPO = 'Cyrene2008/AudioSeeker'
 const API_BASES = [
-  `https://gh-proxy.com/https://api.github.com/repos/${REPO}/releases`,
+  `https://v4.gh-proxy.com/https://api.github.com/repos/${REPO}/releases`,
   `https://api.github.com/repos/${REPO}/releases`
 ]
 
@@ -62,7 +62,7 @@ const error = ref('')
 
 const assetUrl = (asset) => {
   const official = asset.browser_download_url
-  return source.value === 'gh-proxy' ? `https://gh-proxy.com/${official}` : official
+  return source.value === 'gh-proxy' ? `https://v4.gh-proxy.com/${official}` : official
 }
 
 const installerAssets = (release) =>
