@@ -53,7 +53,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: installer-windows-x64
-          path: src-tauri/target/release/bundle/nsis/AudioSeeker_*.exe
+          path: |
+            target/release/bundle/nsis/AudioSeeker_*.exe
+            src-tauri/target/release/bundle/nsis/AudioSeeker_*.exe
           if-no-files-found: error
 
   release:
