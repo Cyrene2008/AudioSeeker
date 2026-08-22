@@ -406,9 +406,17 @@ async function doExport(list) {
   if (!out) return
   try {
     const { name, segment } = splitIndex(selectedIndex.value)
+    // 同一源文件只需导出一次（去重 by file_id）
+    const seen = new Set()
+    const unique = list.filter((o) => {
+      const key = o.file_id || o.path
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
     await api.post('/api/export', {
       index_name: name, segment, out_dir: out,
-      occurrences: list.map((o) => ({
+      occurrences: unique.map((o) => ({
         file_id: o.file_id, path: o.path,
         offset_file: o.offset_file, span: o.span,
         tq0: o.tq0, tq1: o.tq1, aligned: o.aligned, ratio: o.ratio

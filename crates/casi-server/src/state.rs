@@ -88,15 +88,19 @@ impl AppState {
     }
 
     pub fn save_settings(&self, s: &serde_json::Value) {
+        *self.settings.write().unwrap() = s.clone();
         store::save_json(&self.data_dir.join("settings.json"), s);
     }
     pub fn save_registry(&self, r: &serde_json::Value) {
+        *self.registry.write().unwrap() = r.clone();
         store::save_json(&self.data_dir.join("indexes.json"), r);
     }
     pub fn save_favorites(&self, f: &serde_json::Value) {
+        *self.favorites.write().unwrap() = f.clone();
         store::save_json(&self.data_dir.join("favorites.json"), f);
     }
     pub fn save_history(&self, h: &serde_json::Value) {
+        *self.history.write().unwrap() = h.clone();
         store::save_json(&self.data_dir.join("history.json"), h);
     }
     pub fn data_dir(&self) -> &PathBuf {
