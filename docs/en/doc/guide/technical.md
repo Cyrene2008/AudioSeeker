@@ -7,20 +7,20 @@
 │  Vue 3 + VueFluentWidgets    │  Tauri 2 (Rust) desktop shell
 │  Vite frontend               │
 └──────────────┬───────────────┘
-               │ HTTP (127.0.0.1 only)
+               │ Native command IPC (no HTTP port)
 ┌──────────────▼───────────────┐
-│  Python FastAPI backend      │  index / match / audio / export / favorites / settings
-│  fp_core fingerprint core    │
-│  build_index parallel build  │  SQLite shards + .dat binary
+│  Rust engine (casi crates)   │  index / match / export / favorites / settings
+│  casi-core fingerprint core  │
+│  casi-index parallel build   │  .casi binary index (mmap zero-parse)
 └──────────────┬───────────────┘
                │
-     SQLite / NumPy / soundfile / librosa / ffmpeg
+     Rust FFT / custom peak picking / bundled FFmpeg (sidecar)
 ```
 
-- Shell: Tauri 2 (Rust) for the window, installer, Python runtime bootstrap, and backend lifecycle.
-- Backend: FastAPI + Python, listening only on the loopback address as a hidden child process.
+- Shell: Tauri 2 (Rust), single process: window + native command IPC + local engine.
+- Engine: Rust workspace (casi-core / casi-index / casi-search) accessed via Tauri commands; `casi-server` provides an optional HTTP/service form.
 - Frontend: Vue 3 + Vite with VueFluentWidgets Fluent Design components.
-- Audio decoding: librosa/soundfile first; AAC, M4A, WMA and similar formats fall back to the bundled FFmpeg.
+- Audio decoding: WAV read directly; FLAC/MP3/AAC/M4A/WMA fall back to the bundled FFmpeg (GPL sidecar).
 
 ## Fingerprint Algorithm
 
@@ -49,23 +49,22 @@ The pair is combined into a 30-bit hash value, producing a hash sequence per aud
 
 ## Index Structure
 
-### SQLite Shards
+### `.casi` Binary Index (v26.1.0+)
 
-Each segment directory (`seg_XXX` or the index root) contains `shard_*.sqlite` per worker:
+A single `.casi` file contains:
 
-- `files` table: `fid / name / path / duration / status`;
-- `hashes` table: `h / fid / t`, indexed by `ix_h`.
+- 128-byte header (magic `CASI` / version / section offsets);
+- a 2^16 bucket directory (top 16 bits of the 30-bit hash) plus posting arrays ordered by `(hash, frame)` (12 bytes per row: `h/fid/t`);
+- a file metadata table and string pool.
 
-`fid` is globally unique per shard.
+`fid` is globally unique (legacy conversion keeps `(shard<<24)|rowid`).
 
-### .dat Binary
-
-Each shard has a compact `.dat` file storing `(hash, fid, t)` triplets (12 bytes each). Loading maps them directly into sorted NumPy arrays, avoiding SQLite re-parsing and drastically reducing load time for huge indexes.
+Loading is zero-parse: the file is `mmap`ped; lookups use the bucket directory plus binary search inside a bucket. Cold start does not touch unused pages - huge indexes open in milliseconds.
 
 ### Segmentation and Metadata
 
 - Files are greedily grouped by estimated hash count against the target segment memory (MB).
-- `index_meta.json` at the index root records the original `segment_size_mb`, reused as the incremental default.
+- `index_meta.json` at the index root records the original `segment_size_mb`; `index.json` records version and the file manifest (used by incremental builds).
 - Legacy or imported indexes without metadata are treated as `0 MB` (single segment).
 
 ### In-Memory Cache
@@ -84,27 +83,28 @@ Each shard has a compact `.dat` file storing `(hash, fid, t)` triplets (12 bytes
 
 ## Build Flow
 
-- `iter_library_files` collects audio by extension (common formats and mixed folders), optionally recursive.
-- Workers decode, hash, and write shards in parallel with per-file progress events.
-- Incremental builds read the indexed path set from existing shards and process only new files.
-- On completion, total hashes are counted across all `hashes` tables.
+- Audio files are collected by extension (common formats and mixed folders), optionally recursive.
+- Workers decode, hash, and stream postings into the chunked external-sort builder with per-file progress events.
+- Incremental builds read the indexed path set from `index.json` and process only new files.
+- On completion, the total hash count comes from the `.casi` header.
 
 ## Export and Playback
 
-- Export stitches the matched segments (`tq0/tq1`) along the sample timeline into a WAV file.
-- `/api/audio` serves the full remainder of a file from an offset; the frontend player loads the complete file and seeks to the matched offset, so the progress bar shows the full duration.
+- Export copies the matched source files (full audio) into the chosen folder; no segment stitching anymore.
+- Playback loads the complete source file via the Tauri asset protocol (`convertFileSrc`) and seeks to the matched offset, so the progress bar shows the full duration.
 
 ## Repository Layout
 
 ```text
-backend/
-  fp_core.py        fingerprint core: hashing / loading / matching
-  build_index.py    parallel build / resume / segmentation / incremental
-  server.py         FastAPI: index / build / match / audio / export / favorites / settings
+crates/               Rust workspace
+  casi-core          fingerprint core: DSP / peak picking / hashing / decoding
+  casi-index         .casi format: mmap / bucket directory / external-sort builder
+  casi-search        matching and clustering (time-offset voting)
+  casi-server        service form (axum) + pure-function logic layer (api.rs)
 src/                Vue 3 frontend
   stores/           shared state and caches
   views/            search, build, manage, favorites, settings, about
-src-tauri/          Tauri 2 (Rust): window / bootstrap / backend process
+src-tauri/          Tauri 2 (Rust): window / native command IPC / commands.rs
 ```
 
 ## Related Links
