@@ -133,15 +133,17 @@ v26.1.0 起为单进程本地引擎：指纹识别与索引均由内置 Rust 引
 
 - Vue 3 + Vite：桌面界面与状态管理。
 - [VueFluentWidgets](https://fluent.cyrene.hk)：Fluent Design 组件库，MIT License。
-- Tauri 2 + Rust：窗口、安装包、运行时引导和后端进程管理。
-- FastAPI + Python：索引管理、匹配、音频流、导出、收藏和设置 API。
-- SQLite + NumPy：指纹分片存储与内存匹配。
+- Tauri 2 + Rust：单进程本地引擎（窗口 + 原生 command IPC）。
+- Rust 工作区：casi-core（DSP/指纹）、casi-index（.casi 索引）、casi-search（匹配）、casi-server（可选服务化形态）。
+- `.casi` 二进制索引：mmap 零解析加载 + 2^16 桶目录哈希查找。
+- FFmpeg（GPL 版，随包内置 sidecar）：扩展音视频解码。
 
 ## 本地开发
 
 ### 环境
 
-- Node.js 20 或更高版本。
+- Node.js 20 或更高版本（建议 24）。
+- Bun（包管理器）。
 - Rust stable 工具链。
 - Tauri 2 的 Windows 构建依赖。
 
@@ -149,7 +151,6 @@ v26.1.0 起为单进程本地引擎：指纹识别与索引均由内置 Rust 引
 
 ```powershell
 bun install
-bun run sync:backend
 bun run tauri dev
 ```
 
@@ -157,8 +158,7 @@ bun run tauri dev
 
 ```powershell
 bun run build
-python -m py_compile backend/server.py backend/build_index.py
-cargo check --manifest-path src-tauri/Cargo.toml
+cargo test --workspace
 ```
 
 ### 打包
@@ -167,33 +167,31 @@ cargo check --manifest-path src-tauri/Cargo.toml
 bun run build:app
 ```
 
-安装包输出到：
-
-```text
-src-tauri/target/release/bundle/nsis/
-```
+安装包输出到安装包输出目录（`target\release\bundle\nsis\` 或 `src-tauri\target\release\bundle\nsis\`，取决于 Cargo 工作区目标目录）。
 
 ## 仓库结构
 
 ```text
-backend/                  Python 后端与指纹引擎
+crates/                   Rust 工作区（casi-core / casi-index / casi-search / casi-server / casi-cli / casi-convert）
 src/                      Vue 前端
 src/stores/               跨页面状态与共享缓存
 src/views/                检索、构建、管理、收藏、设置、关于
-src-tauri/                Tauri/Rust 桌面外壳
-scripts/                  后端同步与安装包重命名脚本
+src-tauri/                Tauri/Rust 桌面外壳（commands.rs 为原生 IPC 通道）
+scripts/                  安装包重命名脚本
 docs/                     项目文档
 ```
 
 ## 常见问题
 
-### 首次启动一直在准备依赖
+### 检索结果与预期不符（变调/强降噪样本）
 
-请确认网络可访问 Python、PyPI 和 GitHub 镜像。也可以先进入界面，后端会继续启动。
+指纹为峰值对精确匹配：高保真重编码（如 MP3 256k）、中等变速（±6~8%）可保持正确命中；
+**变调（±1 半音以上）或强降噪（约 6kHz 低通）/ 高噪声（SNR≈10dB）样本会失配**，
+这是峰值对指纹算法本身的边界（Shazam 同等水平）。多尺度/对数量化的鲁棒增强在规划中。
 
 ### 管理索引页面统计加载较慢
 
-程序会优先展示缓存的索引列表，再后台读取文件数、哈希数和磁盘占用。大型 SQLite 索引首次统计可能需要一定时间。
+程序会优先展示缓存的索引列表，再后台读取文件数、哈希数和磁盘占用。大型索引首次统计可能需要一定时间。
 
 ### 连续检索同一索引仍然需要重新加载
 
@@ -211,7 +209,7 @@ docs/                     项目文档
 
 - [VueFluentWidgets](https://fluent.cyrene.hk)：MIT License，Copyright © 2025–2026 Cyrene2008。
 - MiSans：遵循 MiSans 字体许可。
-- Python、Rust、JavaScript 依赖：遵循各自的软件许可。
-- FFmpeg：具体许可取决于下载的构建版本和启用功能。
+- Rust、JavaScript 依赖：遵循各自的软件许可。
+- FFmpeg：GPL 构建（BtbN/FFmpeg-Builds），随安装包内置（安装目录 `ffmpeg\bin`）。
 
 Copyright © 2025–2026 Cyrene2008
