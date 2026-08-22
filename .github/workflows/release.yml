@@ -28,6 +28,22 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
+      - name: Bundle FFmpeg sidecar (GPL, offline capability)
+        shell: pwsh
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          $zip = Join-Path $env:RUNNER_TEMP "ffmpeg.zip"
+          curl.exe -L --retry 3 -o $zip "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+          $dir = Join-Path $env:RUNNER_TEMP "ffmpeg_extract"
+          Expand-Archive -Path $zip -DestinationPath $dir
+          $ffmpeg = Get-ChildItem -Path $dir -Recurse -Filter "ffmpeg.exe" | Select-Object -First 1
+          $ffprobe = Get-ChildItem -Path $dir -Recurse -Filter "ffprobe.exe" | Select-Object -First 1
+          if (-not $ffmpeg -or -not $ffprobe) { throw "ffmpeg 解压失败" }
+          New-Item -ItemType Directory -Force -Path "src-tauri/ffmpeg/bin" | Out-Null
+          Copy-Item $ffmpeg.FullName "src-tauri/ffmpeg/bin/ffmpeg.exe"
+          Copy-Item $ffprobe.FullName "src-tauri/ffmpeg/bin/ffprobe.exe"
+          Write-Output "ffmpeg bundled: $((Get-Item 'src-tauri/ffmpeg/bin/ffmpeg.exe').Length) bytes"
+
       - name: Build and package installer
         run: bun run build:app
         env:

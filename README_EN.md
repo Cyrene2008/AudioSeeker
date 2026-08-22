@@ -46,7 +46,7 @@ Cyrene's Audio Seeker is a Windows desktop search tool for large audio libraries
 ## Requirements
 
 - 64-bit Windows 10 or Windows 11.
-- An internet connection on first launch to prepare Python, dependencies, and FFmpeg.
+- No internet needed: Python, dependencies, and FFmpeg are removed or bundled with the installer. Install and use offline.
 - SSD storage is recommended for large indexes.
 - Sufficient disk space and memory for the target library.
 
@@ -55,11 +55,14 @@ The installer uses per-user mode and does not require administrator privileges. 
 ## Installation
 
 1. Download the latest Windows installer from [GitHub Releases](https://github.com/Cyrene2008/AudioSeeker/releases).
-2. Run `AudioSeeker_<version>_x64-setup.exe`.
-3. Let the first-launch bootstrap prepare the runtime.
+2. Run `AudioSeeker_<version>_x64-setup.exe` (installer language follows your OS language).
+3. Launch straight into the main UI - no runtime preparation, no downloads.
 4. Open Build Index and create your first index.
 
-The bootstrap prepares an isolated Python runtime, installs backend dependencies, downloads FFmpeg when needed, and starts a local-only backend service. You may enter the UI while a long bootstrap continues in the background.
+Since v26.1.0 the app is a single-process local engine: fingerprinting and
+search are handled by a built-in Rust engine with a custom `.casi` binary
+index format (mmap, zero-parse loading). No bootstrap downloads, no separate
+backend process.
 
 ## Quick Start
 
@@ -72,7 +75,7 @@ The bootstrap prepares an isolated Python runtime, installs backend dependencies
 5. Enable recursive scanning when subdirectories should be included.
 6. Start the build and monitor progress and logs.
 
-The MB value estimates the memory target for each loaded segment. It is not a strict SQLite file-size limit. `0` disables active segmentation. A single large file is never split and may exceed the target.
+The MB value estimates the memory target for each loaded segment. It is not a strict index file-size limit. `0` disables active segmentation. A single large file is never split and may exceed the target.
 
 ### Incremental build
 
@@ -88,7 +91,7 @@ Select an index, choose a sample, optionally tune the range and thresholds, and 
 - Click the star again to remove an existing favorite.
 - Reveal the source file in Windows Explorer.
 - Merge identical filenames using the highest-confidence occurrence.
-- Stitch selected matches along the sample timeline.
+- Export: copy the matched source files (full audio files) into the chosen folder.
 
 ## Index Cache
 
@@ -100,7 +103,7 @@ Enable **Unload index after search** in Settings on memory-constrained systems. 
 
 | Data | Default location |
 | --- | --- |
-| Application, Python, FFmpeg | Installed application directory |
+| Application, FFmpeg (bundled decoder) | Installed application directory |
 | Newly built indexes | `<application directory>\index` |
 | Settings, favorites, history, registry | Current user's application-data directory |
 | Temporary audio and build progress | Temporary directory under application data |
@@ -117,9 +120,10 @@ Changing the default index location does not move existing or imported indexes.
 
 - Vue 3 and Vite for the desktop UI.
 - [VueFluentWidgets](https://fluent.cyrene.hk) for Fluent Design components.
-- Tauri 2 and Rust for the window, installer, bootstrap, and backend lifecycle.
-- FastAPI and Python for matching, audio streaming, export, favorites, and settings.
-- SQLite and NumPy for fingerprint storage and in-memory matching.
+- Tauri 2 and Rust for the window, native command IPC, and the single-process engine.
+- Rust workspaces: casi-core (DSP/fingerprints), casi-index (`.casi` index), casi-search (voting matching), casi-server (optional HTTP/service form; the desktop client uses Tauri commands directly).
+- `.casi` binary hash-table format with mmap mapping and 2^16 bucket directory.
+- FFmpeg bundled as a sidecar (GPL build) for extra codec coverage.
 
 ## Development
 
