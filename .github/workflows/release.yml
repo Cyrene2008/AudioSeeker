@@ -95,14 +95,14 @@ jobs:
         run: |
           TAG="v${{ steps.version.outputs.version }}"
           cd assets
-          ASSETS=$(ls -1 | tr '\n' ' ')
+          ASSETS=$(find . -type f | tr '\n' ' ')
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "==> Release $TAG exists, updating assets and appending changelog"
             gh release upload "$TAG" $ASSETS --clobber
             gh release edit "$TAG" --notes-file ../changelog.txt
           else
             echo "==> Creating release $TAG"
-            gh release create "$TAG" $ASSETS --title "Cyreneの音频检索器 v${{ steps.version.outputs.version }}" --notes-file ../changelog.txt
+            gh release create "$TAG" $ASSETS --title "Cyreneの音频検索器 v${{ steps.version.outputs.version }}" --notes-file ../changelog.txt
           fi
         env:
           GH_TOKEN: ${{ github.token }}
