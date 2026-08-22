@@ -1,0 +1,13 @@
+[package]
+name = "casi-index"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = ".casi 索引格式：二进制哈希表 + mmap 零解析加载"
+
+[dependencies]
+memmap2.workspace = true
+casi-core.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

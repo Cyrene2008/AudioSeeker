@@ -46,3 +46,13 @@ favorites.json
 # 系统
 Thumbs.db
 .DS_Store
+
+# 本地规划文档（不提交）
+.plan/
+
+# Rust 工作区产物
+target/
+src-tauri/ffmpeg/bin/ffmpeg.exe
+src-tauri/ffmpeg/bin/ffprobe.exe
+
+.target-tauri/

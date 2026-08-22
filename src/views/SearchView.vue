@@ -150,7 +150,7 @@ import {
 } from 'vue-fluent-widgets'
 import { Icon } from '@iconify/vue'
 import { t } from '../utils/i18n'
-import { api, audioUrl, pickFile, savePath, tauri } from '../utils/api'
+import { api, audioUrl, pickFile, pickDir, tauri } from '../utils/api'
 import { playTrack } from '../stores/player'
 import { searchState, startSearch } from '../stores/search'
 import { indexState, refreshIndexes } from '../stores/indexes'
@@ -402,14 +402,15 @@ async function exportAll() {
 
 async function doExport(list) {
   if (!list.length) return
-  const out = await savePath('export.wav', [{ name: 'WAV', extensions: ['wav'] }])
+  const out = await pickDir()
   if (!out) return
   try {
     const { name, segment } = splitIndex(selectedIndex.value)
     await api.post('/api/export', {
-      index_name: name, segment, out_path: out,
+      index_name: name, segment, out_dir: out,
       occurrences: list.map((o) => ({
-        file_id: o.file_id, offset_file: o.offset_file, span: o.span,
+        file_id: o.file_id, path: o.path,
+        offset_file: o.offset_file, span: o.span,
         tq0: o.tq0, tq1: o.tq1, aligned: o.aligned, ratio: o.ratio
       }))
     })

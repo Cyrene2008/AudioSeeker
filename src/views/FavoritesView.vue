@@ -56,7 +56,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { FluentButton, FluentEmptyState } from 'vue-fluent-widgets'
 import { Icon } from '@iconify/vue'
 import { t } from '../utils/i18n'
-import { api, audioUrl, savePath, tauri } from '../utils/api'
+import { api, audioUrl, pickDir, tauri } from '../utils/api'
 import { playTrack } from '../stores/player'
 import { pushToast } from '../components/ToastHost.vue'
 
@@ -111,11 +111,11 @@ async function exportSelected() {
 
 async function doExport(list) {
   if (!list.length) return
-  const out = await savePath('export.wav', [{ name: 'WAV', extensions: ['wav'] }])
+  const out = await pickDir()
   if (!out) return
   try {
     await api.post('/api/export', {
-      index_name: list[0].index_name, out_path: out,
+      index_name: list[0].index_name, out_dir: out,
       occurrences: list.map((f) => ({
         path: f.path,
         offset_file: f.offset, span: f.span, tq0: 0, tq1: 0
