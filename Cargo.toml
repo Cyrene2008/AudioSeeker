@@ -1,0 +1,35 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/casi-core",
+    "crates/casi-index",
+    "crates/casi-search",
+    "crates/casi-cli",
+    "crates/casi-convert",
+    "crates/casi-server",
+    "src-tauri",
+]
+
+[workspace.package]
+edition = "2021"
+version = "26.1.0"
+license = "GPL-3.0-or-later"
+
+[workspace.dependencies]
+casi-core = { path = "crates/casi-core" }
+casi-index = { path = "crates/casi-index" }
+casi-search = { path = "crates/casi-search" }
+ahash = "0.8"
+rustfft = "6"
+hound = "3.5"
+memmap2 = "0.9"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+clap = { version = "4", features = ["derive", "env"] }
+rayon = "1"
+tempfile = "3"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1

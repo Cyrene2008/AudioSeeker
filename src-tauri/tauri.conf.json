@@ -1,13 +1,13 @@
 {
   "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-cli/schema.json",
   "productName": "Cyreneの音频检索器",
-  "version": "26.0.0",
+  "version": "26.1.0",
   "identifier": "hk.cyrene.audioseeker",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
-    "beforeDevCommand": "bun run sync:backend && bun run dev",
-    "beforeBuildCommand": "bun run sync:backend && bun run build"
+    "beforeDevCommand": "bun run dev",
+    "beforeBuildCommand": "bun run build"
   },
   "app": {
     "withGlobalTauri": true,
@@ -27,19 +27,28 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["**"]
+      }
     }
   },
   "bundle": {
     "active": true,
     "targets": ["nsis"],
+    "license": "GPL-3.0-or-later",
+    "licenseFile": "../LICENSE",
     "windows": {
       "nsis": {
-        "installMode": "currentUser"
+        "installMode": "currentUser",
+        "languages": ["English", "SimpChinese"],
+        "displayLanguageSelector": false,
+        "installerIcon": "icons/icon.ico"
       }
     },
     "resources": {
-      "resources/backend/": "backend/",
+      "ffmpeg/": "ffmpeg/",
       "../LICENSE": "LICENSE",
       "../THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md"
     },

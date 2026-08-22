@@ -1,0 +1,28 @@
+[package]
+name = "casi-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Cyrene AudioSeeker 内嵌 HTTP 服务（axum，单进程）"
+
+[lib]
+name = "casi_server"
+path = "src/lib.rs"
+
+[[bin]]
+name = "casi-server"
+path = "src/main.rs"
+
+[dependencies]
+casi-core.workspace = true
+casi-index.workspace = true
+casi-search.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+axum = { version = "0.7", features = ["http2", "json", "multipart"] }
+tokio = { version = "1", features = ["full"] }
+tower-http = { version = "0.5", features = ["cors", "fs", "trace"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+uuid = { version = "1", features = ["v4"] }
+rayon.workspace = true
+tempfile.workspace = true

@@ -1,0 +1,17 @@
+[package]
+name = "casi-convert"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "一次性迁移工具：旧 SQLite 索引 → .casi（读取 .dat 预载 + sqlite files 表）"
+
+[[bin]]
+name = "casi-convert"
+path = "src/main.rs"
+
+[dependencies]
+casi-index.workspace = true
+casi-core.workspace = true
+rusqlite = { version = "0.32", features = ["bundled"] }
+serde_json.workspace = true
+tempfile.workspace = true

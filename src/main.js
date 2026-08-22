@@ -12,17 +12,25 @@ import { settings, onSettingsChange } from './stores/settings'
 let appMounted = false
 
 function reportError(msg, loc = '', stack = '') {
-  // 上报到后端 error.log（后端可用时）
+  // 上报后端日志：Tauri 走原生 command，浏览器走 HTTP（后端可用时）
   try {
-    fetch(`http://127.0.0.1:${window.__CYRENE_PORT__ || 8765}/api/error-log`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message: String(msg).slice(0, 2000),
-        location: String(loc).slice(0, 500),
-        stack: String(stack).slice(0, 3000)
-      })
-    }).catch(() => {})
+    const body = {
+      message: String(msg).slice(0, 2000),
+      location: String(loc).slice(0, 500),
+      stack: String(stack).slice(0, 3000)
+    }
+    const isTauri = '__TAURI_INTERNALS__' in window || '__TAURI__' in window
+    if (isTauri) {
+      import('@tauri-apps/api/core').then(({ invoke }) =>
+        invoke('casi_error_log', { payload: body }).catch(() => {})
+      ).catch(() => {})
+    } else {
+      fetch(`http://127.0.0.1:${window.__CYRENE_PORT__ || 8765}/api/error-log`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      }).catch(() => {})
+    }
   } catch { /* ignore */ }
 }
 

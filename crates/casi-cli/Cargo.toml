@@ -1,0 +1,21 @@
+[package]
+name = "casi-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Cyrene AudioSeeker .casi 索引命令行工具"
+
+[[bin]]
+name = "casi"
+path = "src/main.rs"
+
+[dependencies]
+casi-core.workspace = true
+casi-index.workspace = true
+casi-search.workspace = true
+ahash.workspace = true
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+rayon.workspace = true
+tempfile.workspace = true

@@ -1,0 +1,15 @@
+[package]
+name = "casi-search"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = ".casi 检索引擎：时间偏移对齐投票 + 簇合并"
+
+[dependencies]
+casi-index.workspace = true
+casi-core.workspace = true
+ahash.workspace = true
+rayon.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
