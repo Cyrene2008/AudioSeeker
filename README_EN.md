@@ -129,7 +129,6 @@ Changing the default index location does not move existing or imported indexes.
 
 ```powershell
 bun install
-bun run sync:backend
 bun run tauri dev
 ```
 
@@ -137,8 +136,7 @@ Validation:
 
 ```powershell
 bun run build
-python -m py_compile backend/server.py backend/build_index.py
-cargo check --manifest-path src-tauri/Cargo.toml
+cargo test --workspace
 ```
 
 Package the application:
@@ -147,33 +145,37 @@ Package the application:
 bun run build:app
 ```
 
-The NSIS installer is generated under `src-tauri/target/release/bundle/nsis/`.
+The NSIS installer is generated under `target/release/bundle/nsis/` (or `src-tauri/target/...` depending on the Cargo target dir).
 
 ## Repository Layout
 
 ```text
-backend/                  Python backend and fingerprint engine
+crates/                   Rust workspace (casi-core / casi-index / casi-search / casi-server / casi-cli / casi-convert)
 src/                      Vue frontend
 src/stores/               Shared state and cross-route caches
 src/views/                Search, build, manage, favorites, settings, about
-src-tauri/                Tauri/Rust desktop shell
-scripts/                  Backend sync and installer rename scripts
+src-tauri/                Tauri/Rust desktop shell (commands.rs = native IPC channel)
+scripts/                  Installer rename script
 docs/                     Project documentation
 ```
 
 ## Troubleshooting
 
-### First launch takes a long time
+### Search misses on pitch-shifted or heavily denoised samples
 
-Check access to Python, PyPI, and GitHub mirrors. You may enter the application while bootstrap continues.
+Fingerprints are exact peak-pair matches: high-fidelity re-encodes (e.g. MP3 256k) and
+moderate tempo changes (±6-8%) are matched correctly; **pitch shifts (≥ ±1 semitone) or
+heavy denoising (≈6 kHz low-pass) / high noise (SNR≈10dB) samples will not match** - this
+is the known boundary of peak-pair algorithms (same as raw Shazam). Multi-scale / log-quantized
+robustness enhancements are on the roadmap.
 
 ### Manage Indexes takes time to show statistics
 
-The cached registry is displayed first. File, hash, and disk statistics are refreshed in the background; counting very large SQLite indexes may take time on the first pass.
+The cached registry is displayed first. File, hash, and disk statistics are refreshed in the background; counting very large indexes may take time on the first pass.
 
 ### The same index reloads on every search
 
-Disable **Unload index after search**. Recently used segments will remain in the backend cache.
+Disable **Unload index after search**. Recently used segments will remain in the engine cache.
 
 ## License
 
@@ -183,7 +185,8 @@ This program comes without warranty. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NO
 
 - [VueFluentWidgets](https://fluent.cyrene.hk): MIT License, Copyright © 2025–2026 Cyrene2008.
 - MiSans: subject to the MiSans font license.
-- Python, Rust, and JavaScript dependencies: subject to their respective licenses.
+- Rust and JavaScript dependencies: subject to their respective licenses.
+- FFmpeg: GPL build (BtbN/FFmpeg-Builds), bundled with the installer (`ffmpeg\bin`).
 - FFmpeg: license depends on the downloaded build and enabled features.
 
 Copyright © 2025–2026 Cyrene2008

@@ -4,7 +4,7 @@ import { tauri } from './api'
 
 const GITHUB_REPO = 'Cyrene2008/AudioSeeker'
 const FALLBACK_URLS = [
-  `https://gh-proxy.com/https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
+  `https://v4.gh-proxy.com/https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
   `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`
 ]
 const OFFICIAL_RELEASE_URL = `https://github.com/${GITHUB_REPO}/releases/latest`
@@ -45,7 +45,7 @@ function releaseDownloadUrl(data) {
   const installer = assets.find((asset) => /AudioSeeker_.*_x64-setup\.exe$/i.test(asset.name))
     || assets.find((asset) => /x64.*setup\.exe$/i.test(asset.name))
   if (!installer?.browser_download_url) return data.html_url || OFFICIAL_RELEASE_URL
-  return `https://gh-proxy.com/${installer.browser_download_url}`
+  return `https://v4.gh-proxy.com/${installer.browser_download_url}`
 }
 
 export async function checkUpdate() {
