@@ -50,7 +50,7 @@ pub fn scan_audio_files(dir: &Path, recursive: bool) -> Result<Vec<std::path::Pa
             }
             if let Some(ext) = p.extension().and_then(|e| e.to_str()) {
                 let e = ext.to_ascii_lowercase();
-                if matches!(e.as_str(), "wav" | "flac" | "mp3" | "ogg" | "oga" | "opus" | "aac" | "m4a" | "mp4" | "wma" | "aiff" | "aif") {
+                if matches!(e.as_str(), "wav" | "flac" | "mp3" | "ogg" | "oga" | "opus" | "aac" | "m4a" | "mp4" | "wma" | "aiff" | "aif" | "mkv" | "mov" | "webm" | "avi" | "flv") {
                     out.push(p);
                 }
             }

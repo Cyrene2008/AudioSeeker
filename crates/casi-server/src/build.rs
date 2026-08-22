@@ -211,7 +211,7 @@ fn scan_audio(dir: &std::path::Path, recursive: bool) -> Vec<PathBuf> {
                 if matches!(
                     e.as_str(),
                     "wav" | "flac" | "mp3" | "ogg" | "oga" | "opus" | "aac" | "m4a" | "mp4"
-                        | "wma" | "aiff" | "aif"
+                    | "wma" | "aiff" | "aif" | "mkv" | "mov" | "webm" | "avi" | "flv"
                 ) {
                     out.push(p);
                 }

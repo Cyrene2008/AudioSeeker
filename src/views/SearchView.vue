@@ -266,7 +266,7 @@ async function loadIndexes() {
 }
 
 async function pickSample() {
-  const f = await pickFile([{ name: '音频', extensions: ['wav', 'mp3', 'flac', 'ogg', 'oga', 'opus', 'aac', 'm4a', 'mp4', 'wma', 'aiff', 'aif'] }])
+  const f = await pickFile([{ name: '音频 / 视频', extensions: ['wav', 'mp3', 'flac', 'ogg', 'oga', 'opus', 'aac', 'm4a', 'mp4', 'wma', 'aiff', 'aif', 'mkv', 'mov', 'webm', 'avi'] }])
   if (f) sample.value = f
 }
 

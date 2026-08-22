@@ -67,7 +67,7 @@ textarea {
   min-width: 0;
   min-height: 0;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible; /* 允许播放器弹层（倍速/音量）向上溢出而不被裁剪 */
 }
 
 .app-content {
