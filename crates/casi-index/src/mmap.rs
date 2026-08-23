@@ -124,9 +124,12 @@ impl CasiFile {
             return usize::MAX..usize::MAX;
         }
         let base = self.postings_off();
+        let map_len = self.map.len();
         let row_abs = |i: usize| -> u32 {
             let o = base + i * POSTING_LEN;
-            debug_assert!(o + POSTING_LEN <= self.map.len());
+            if o + 4 > map_len {
+                panic!("casi: mmap 越界 (o={o}, map_len={map_len})");
+            }
             u32::from_le_bytes(self.map[o..o + 4].try_into().unwrap())
         };
         // 桶内 h 升序 → 二分定位（绝对行下标）
@@ -145,6 +148,9 @@ impl CasiFile {
     #[inline]
     pub fn posting(&self, i: usize) -> PostingRow {
         let off = self.postings_off() + i * POSTING_LEN;
+        if off + POSTING_LEN > self.map.len() {
+            panic!("casi: posting OOB (i={i}, map_len={})", self.map.len());
+        }
         let m = &self.map[off..off + POSTING_LEN];
         PostingRow {
             h: u32::from_le_bytes(m[0..4].try_into().unwrap()),

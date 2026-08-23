@@ -94,6 +94,23 @@ enum Cmd {
 }
 
 fn main() {
+    // Panic 日志：写入 ~/.casi-panic.log，闪退后可查
+    std::panic::set_hook(Box::new(|info| {
+        let thread = std::thread::current().name().unwrap_or("?").to_string();
+        let loc = info.location().map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column())).unwrap_or_default();
+        let payload = info.payload();
+        let msg = payload.downcast_ref::<String>().map(|s| s.as_str())
+            .or_else(|| payload.downcast_ref::<&str>().copied())
+            .unwrap_or("unknown");
+        let full = format!("[{thread}] {loc}: {msg}\n");
+        eprintln!("{full}");
+        if let Ok(home) = std::env::var("USERPROFILE").or_else(|_| std::env::var("HOME")) {
+            let _ = std::fs::write(
+                std::path::PathBuf::from(home).join(".casi-panic.log"),
+                &full,
+            );
+        }
+    }));
     let cli = Cli::parse();
     let code = match cli.cmd {
         Cmd::Build { src_dir, out, workers, recursive, incremental, chunk_rows } => {
