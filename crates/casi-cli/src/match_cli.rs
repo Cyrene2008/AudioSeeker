@@ -59,13 +59,17 @@ pub fn run_match(
     let total_seg = indexes.len();
 
     let y = load_and_trim(sample, from_s, to_s)?;
+    let t1 = std::time::Instant::now();
     let n = casi_core::frame_count(y.len());
     let m = casi_core::dsp::stft_db(&y);
+    eprintln!("[casi] STFT {:.1}s", t1.elapsed().as_secs_f64());
     let hs = casi_core::extract_hashes(&m, n);
-    println!("样本哈希数: {}", hs.len());
+    eprintln!("[casi] 指纹 {:.1}s ({} hashes)", t1.elapsed().as_secs_f64(), hs.len());
 
     let refs: Vec<&CasiFile> = indexes.iter().map(|o| &o.file).collect();
+    let t2 = std::time::Instant::now();
     let occs = match_index(&refs, &hs, min_aligned, min_ratio, 2);
+    eprintln!("[casi] 检索 {:.1}s ({} hits)", t2.elapsed().as_secs_f64(), occs.len());
     let time_taken = t0.elapsed().as_secs_f64();
     println!(
         "检索完成: 载入 {total_seg} 段, 命中 {} 处, 耗时 {:.2}s",
