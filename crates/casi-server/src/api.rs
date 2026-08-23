@@ -11,7 +11,7 @@ use std::time::Instant;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use casi_search::{match_index, Occurrence};
+use casi_search::{effective_memory_budget_mb, match_index_with_config, Occurrence};
 
 use crate::state::AppState;
 use crate::{build, segments};
@@ -395,6 +395,10 @@ pub struct MatchModel {
     pub to_s: Option<f64>,
     pub min_aligned: Option<u32>,
     pub min_ratio: Option<f64>,
+    #[serde(default)]
+    pub threads: usize,
+    #[serde(default)]
+    pub memory_mb: usize,
 }
 
 pub fn run_match(state: &AppState, m: MatchModel) -> ApiResult {
@@ -443,8 +447,22 @@ pub fn run_match(state: &AppState, m: MatchModel) -> ApiResult {
     let hs = casi_core::extract_hashes(&m_mat, n_frames);
     dbg(&format!("hashes: {} (stft+hash {:.1}s)", hs.len(), t0.elapsed().as_secs_f64()));
     let refs: Vec<&casi_index::CasiFile> = indexes.iter().map(|c| c.as_ref()).collect();
+    let search_threads = if m.threads == 0 {
+        rayon::current_num_threads()
+    } else {
+        m.threads.max(1)
+    };
+    let memory_budget_mb = effective_memory_budget_mb(m.memory_mb);
     dbg("calling match_index...");
-    let occs = match_index(&refs, &hs, m.min_aligned, m.min_ratio, 2);
+    let occs = match_index_with_config(
+        &refs,
+        &hs,
+        m.min_aligned,
+        m.min_ratio,
+        2,
+        search_threads,
+        memory_budget_mb,
+    );
     dbg(&format!("match_index done: {} occurrences ({:.1}s)", occs.len(), t0.elapsed().as_secs_f64()));
     let _dur_ms = t0.elapsed().as_millis();
 
@@ -462,7 +480,6 @@ pub fn run_match(state: &AppState, m: MatchModel) -> ApiResult {
     }
     // 前端渲染限制：保留 top 500（避免 IPC 载荷过大导致 WebView crash）
     const MAX_DISPLAY: usize = 500;
-    let display_count = enriched.len();
     enriched.truncate(MAX_DISPLAY);
 
     add_history(
@@ -484,6 +501,8 @@ pub fn run_match(state: &AppState, m: MatchModel) -> ApiResult {
         "segment": seg_name,
         "index_name": m.index_name,
         "hash_count": hs.len(),
+        "search_threads": search_threads,
+        "memory_budget_mb": memory_budget_mb,
         "occurrences": enriched,
     });
     dbg(&format!("response ready: {} bytes", response.to_string().len()));

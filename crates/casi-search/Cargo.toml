@@ -10,6 +10,7 @@ casi-index.workspace = true
 casi-core.workspace = true
 ahash.workspace = true
 rayon.workspace = true
+sysinfo.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

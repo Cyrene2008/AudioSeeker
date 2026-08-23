@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use casi_index::CasiFile;
-use casi_search::{match_index, Occurrence};
+use casi_search::{match_index_with_config, Occurrence};
 
 use crate::util::{fmt_sec, load_and_trim};
 
@@ -52,6 +52,8 @@ pub fn run_match(
     min_aligned: Option<u32>,
     min_ratio: Option<f64>,
     top: usize,
+    threads: usize,
+    memory_mb: usize,
     json_out: Option<&Path>,
 ) -> Result<(), String> {
     let t0 = std::time::Instant::now();
@@ -68,7 +70,7 @@ pub fn run_match(
 
     let refs: Vec<&CasiFile> = indexes.iter().map(|o| &o.file).collect();
     let t2 = std::time::Instant::now();
-    let occs = match_index(&refs, &hs, min_aligned, min_ratio, 2);
+    let occs = match_index_with_config(&refs, &hs, min_aligned, min_ratio, 2, threads, memory_mb);
     eprintln!("[casi] 检索 {:.1}s ({} hits)", t2.elapsed().as_secs_f64(), occs.len());
     let time_taken = t0.elapsed().as_secs_f64();
     println!(

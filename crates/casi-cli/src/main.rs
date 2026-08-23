@@ -66,6 +66,12 @@ enum Cmd {
         /// 输出前 N 条
         #[arg(long, default_value_t = 0)]
         top: usize,
+        /// 检索线程数（0=自动）
+        #[arg(long, default_value_t = 0)]
+        threads: usize,
+        /// 投票数组预算（MB，0=按当前可用内存自动）
+        #[arg(long, default_value_t = 0)]
+        memory_mb: usize,
         /// JSON 输出到文件
         #[arg(long)]
         json: Option<PathBuf>,
@@ -118,8 +124,8 @@ fn main() {
                 println!("{msg}");
             })
         }
-        Cmd::Match { sample, index, from, to, min_aligned, min_ratio, top, json } => {
-            match match_cli::run_match(&sample, &index, from, to, min_aligned, min_ratio, top, json.as_deref()) {
+        Cmd::Match { sample, index, from, to, min_aligned, min_ratio, top, threads, memory_mb, json } => {
+            match match_cli::run_match(&sample, &index, from, to, min_aligned, min_ratio, top, threads, memory_mb, json.as_deref()) {
                 Ok(()) => 0,
                 Err(e) => {
                     eprintln!("match 失败: {e}");

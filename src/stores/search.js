@@ -9,6 +9,8 @@ export const searchState = reactive({
   toS: '',
   minAligned: 8,
   minRatio: '',
+  searchThreads: 0,
+  searchMemoryMb: 0,
   mergeResults: false,
   occs: [],
   selected: new Set(),
