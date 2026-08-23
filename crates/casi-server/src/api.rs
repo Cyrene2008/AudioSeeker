@@ -398,17 +398,29 @@ pub struct MatchModel {
 }
 
 pub fn run_match(state: &AppState, m: MatchModel) -> ApiResult {
+    let dbg = |msg: &str| {
+        let _ = std::fs::OpenOptions::new().create(true).append(true).open(
+            std::env::temp_dir().join("casi-debug.log"),
+        ).and_then(|mut f| {
+            use std::io::Write;
+            writeln!(f, "[{}] {msg}", chrono::Local::now().format("%H:%M:%S%.3f"))
+        });
+    };
+    dbg("run_match start");
     let (seg_dir, seg_name) = segments::resolve_index(state, &m.index_name, m.segment.as_deref())
         .map_err(ApiError::not_found)?;
     let sample_path = PathBuf::from(&m.sample);
     if !sample_path.is_file() {
         return Err(ApiError::bad("样本文件不存在"));
     }
+    dbg("loading index...");
     let indexes = segments::load_segment(state, &seg_dir).map_err(ApiError::inner)?;
 
     let t0 = Instant::now();
+    dbg("decoding audio...");
     let y = casi_core::load_audio(&sample_path)
         .map_err(|e| ApiError::inner(format!("样本解码失败: {e}")))?;
+    dbg(&format!("decoded {} samples", y.len()));
     let y_trimmed = match (m.from_s.unwrap_or(0.0), m.to_s) {
         (f, Some(t)) => {
             let a = (f * casi_core::SR as f64) as usize;
@@ -425,10 +437,15 @@ pub fn run_match(state: &AppState, m: MatchModel) -> ApiResult {
         return Err(ApiError::bad("样本切片为空"));
     }
     let n_frames = casi_core::frame_count(y_trimmed.len());
+    dbg(&format!("stft: {} samples -> {} frames", y_trimmed.len(), n_frames));
     let m_mat = casi_core::dsp::stft_db(&y_trimmed);
+    dbg("stft done, extracting hashes...");
     let hs = casi_core::extract_hashes(&m_mat, n_frames);
+    dbg(&format!("hashes: {} (stft+hash {:.1}s)", hs.len(), t0.elapsed().as_secs_f64()));
     let refs: Vec<&casi_index::CasiFile> = indexes.iter().map(|c| c.as_ref()).collect();
+    dbg("calling match_index...");
     let occs = match_index(&refs, &hs, m.min_aligned, m.min_ratio, 2);
+    dbg(&format!("match_index done: {} occurrences ({:.1}s)", occs.len(), t0.elapsed().as_secs_f64()));
     let _dur_ms = t0.elapsed().as_millis();
 
     let mut by_id = std::collections::HashMap::new();
@@ -459,15 +476,18 @@ pub fn run_match(state: &AppState, m: MatchModel) -> ApiResult {
         }),
         &enriched,
     );
+    dbg("history saved, building response...");
     if state.settings_value().get("unload_index_after_search").and_then(|v| v.as_bool()).unwrap_or(false) {
         state.index_cache.write().unwrap().remove(&seg_dir.to_string_lossy().into_owned());
     }
-    Ok(json!({
+    let response = json!({
         "segment": seg_name,
         "index_name": m.index_name,
         "hash_count": hs.len(),
         "occurrences": enriched,
-    }))
+    });
+    dbg(&format!("response ready: {} bytes", response.to_string().len()));
+    Ok(response)
 }
 
 fn occurrence_json(o: &Occurrence, name: &str, path: &str, dur: f64) -> Value {
