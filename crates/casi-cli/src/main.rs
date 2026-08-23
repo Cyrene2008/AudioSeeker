@@ -94,7 +94,7 @@ enum Cmd {
 }
 
 fn main() {
-    // Panic 日志：写入 ~/.casi-panic.log，闪退后可查
+    // Panic 日志（仅捕获 Rust panic，c0000409 fastfail 需 Windows 事件日志）
     std::panic::set_hook(Box::new(|info| {
         let thread = std::thread::current().name().unwrap_or("?").to_string();
         let loc = info.location().map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column())).unwrap_or_default();
