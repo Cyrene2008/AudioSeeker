@@ -23,6 +23,8 @@
       <FluentInput v-model.number="toS" type="number" :label="t('toSec')" :placeholder="t('toEnd')" :min="0" />
       <FluentInput v-model.number="minAligned" type="number" :label="t('minAligned')" :min="1" />
       <FluentInput v-model.number="minRatio" type="number" :label="t('minRatio')" :placeholder="t('autoRatio')" :min="0" />
+      <FluentInput v-model.number="searchThreads" type="number" :label="t('searchThreads')" :placeholder="t('autoZero')" :min="0" />
+      <FluentInput v-model.number="searchMemoryMb" type="number" :label="t('memoryBudgetMb')" :placeholder="t('autoZero')" :min="0" />
       <FluentButton class="match-button" :disabled="busy" @click="doMatch">
         <FluentProgressRing v-if="busy" :size="16" />
         {{ busy ? t('matching') : t('startMatch') }}
@@ -215,7 +217,7 @@ const indexItems = computed(() => {
   return items
 })
 const indexes = computed(() => indexState.items)
-const { selectedIndex, sample, fromS, toS, minAligned, minRatio,
+const { selectedIndex, sample, fromS, toS, minAligned, minRatio, searchThreads, searchMemoryMb,
         mergeResults, occs, selected, lastMeta, searched, busy, error: searchError } = toRefs(searchState)
 const backendUp = backendState; startBackendPoll()
 
@@ -294,7 +296,9 @@ async function doMatch() {
       from_s: fromS.value || 0,
       to_s: toS.value === '' ? null : Number(toS.value),
       min_aligned: minAligned.value || 8,
-      min_ratio: minRatio.value === '' ? null : Number(minRatio.value) / 100
+      min_ratio: minRatio.value === '' ? null : Number(minRatio.value) / 100,
+      threads: Number(searchThreads.value) || 0,
+      memory_mb: Number(searchMemoryMb.value) || 0
     }
     const r = await startSearch(body)
     backendUp.ready = true
