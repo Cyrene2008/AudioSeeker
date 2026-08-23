@@ -443,6 +443,11 @@ pub fn run_match(state: &AppState, m: MatchModel) -> ApiResult {
             enriched.push(occurrence_json(o, name, path, *dur));
         }
     }
+    // 前端渲染限制：保留 top 500（避免 IPC 载荷过大导致 WebView crash）
+    const MAX_DISPLAY: usize = 500;
+    let display_count = enriched.len();
+    enriched.truncate(MAX_DISPLAY);
+
     add_history(
         state,
         json!({
